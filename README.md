@@ -1,119 +1,119 @@
 # Liquidity Hub Demo
 
-Интерактивный прототип приложения для управления ликвидностью с моковыми данными.
+An interactive liquidity management application prototype with mock data.
 
-## Запуск
+## Getting Started
 
-Просто откройте файл `index.html` в браузере. Все данные хранятся в localStorage.
+Simply open the `index.html` file in your browser. All data is stored in localStorage.
 
-## Функционал
+## Features
 
-### 1. Подключение кошелька
-- Нажмите "Connect Wallet" в правом верхнем углу
-- Адрес кошелька генерируется автоматически (demo mode)
-- Все данные сохраняются в localStorage
-- Для отключения нажмите на адрес кошелька и подтвердите
+### 1. Wallet Connection
+- Click "Connect Wallet" in the top right corner
+- Wallet address is generated automatically (demo mode)
+- All data is saved in localStorage
+- To disconnect, click on the wallet address and confirm
 
-### 2. Пополнение баланса (Top Up)
-- После подключения кошелька появится кнопка "Top Up"
-- Выберите стейблкоин (USDS, USDC, DAI, USDT)
-- Введите сумму для пополнения
-- Баланс мгновенно обновится
+### 2. Balance Top-Up
+- After connecting your wallet, a "Top Up" button will appear
+- Select a stablecoin (USDS, USDC, DAI, USDT)
+- Enter the amount to top up
+- Balance will update instantly
 
-### 3. Депозиты
-- Нажмите "Deposit" на главной странице или в таблице активов
-- Выберите пул для депозита
-- Выберите актив из вашего баланса (можно депонировать любой актив в любой пул)
-- Система автоматически конвертирует по текущим ценам
-- Нажмите "Confirm Deposit"
+### 3. Deposits
+- Click "Deposit" on the main page or in the assets table
+- Select a pool for deposit
+- Choose an asset from your balance (you can deposit any asset into any pool)
+- The system automatically converts at current prices
+- Click "Confirm Deposit"
 
-**Особенность**: Вы можете положить, например, USDC в пул stETH - система автоматически конвертирует по рыночному курсу.
+**Feature**: You can deposit, for example, USDC into the stETH pool - the system will automatically convert at market rate.
 
-### 4. Вывод средств (Withdraw)
-- В таблице активов найдите пул с балансом > 0
-- Нажмите "Withdraw"
-- Введите сумму или нажмите "MAX"
-- Если актив используется как коллатерал и есть активные займы, система проверит достаточность оставшегося коллатерала
+### 4. Withdrawals
+- In the assets table, find a pool with balance > 0
+- Click "Withdraw"
+- Enter the amount or click "MAX"
+- If the asset is used as collateral and there are active loans, the system will check for sufficient remaining collateral
 
-### 5. Использование как коллатерал
-- Для активов с балансом > 0 доступен переключатель "Use as collateral"
-- Включите переключатель для использования актива в качестве обеспечения
-- Активный коллатерал позволяет брать займы
+### 5. Use as Collateral
+- For assets with balance > 0, a "Use as collateral" toggle is available
+- Enable the toggle to use the asset as collateral
+- Active collateral allows you to take out loans
 
-### 6. Займы (Borrow)
-- Перейдите на вкладку "Borrow" (💳 в боковой панели)
-- Убедитесь, что у вас есть активный коллатерал
-- Доступная сумма займа = Стоимость коллатерала / 1.5 (требуется 150% обеспечение)
-- Введите сумму займа
-- Нажмите "Confirm Borrow"
-- Заём появится в разделе "Your Active Borrows"
+### 6. Borrowing
+- Go to the "Borrow" tab
+- Make sure you have active collateral
+- Available loan amount = Collateral value / 1.5 (150% collateralization required)
+- Enter the loan amount
+- Click "Confirm Borrow"
+- The loan will appear in the "Your Active Borrows" section
 
-### 7. Возврат займа (Repay)
-- В разделе "Your Active Borrows" найдите активный займ
-- Доступно два варианта:
-  - **Repay Part**: частичное погашение (введите сумму)
-  - **Repay Full**: полное погашение долга + проценты
-- После полного погашения коллатерал разблокируется
+### 7. Loan Repayment
+- In the "Your Active Borrows" section, find an active loan
+- Two options available:
+  - **Repay Part**: partial repayment (enter amount)
+  - **Repay Full**: full repayment of debt + interest
+- After full repayment, collateral is unlocked
 
-### 8. Детальная страница пула
-- Кликните на любую строку в таблице активов для открытия детальной страницы пула
-- Полная информация о пуле:
-  - Total supplied (общий объём депозитов)
-  - Deposit APY (процент доходности)
-  - Supply cap (лимит депозитов)
-  - График Supply Rate (APR) за период
-  - Market Overview с Utilization rate (процент использования)
-  - Параметры коллатерала (Max LTV, Liquidation threshold, penalty)
-  - E-Mode параметры
-- Раздел "My Wallet" показывает:
-  - Баланс пользователя в этом активе
+### 8. Pool Detail Page
+- Click on any row in the assets table to open the pool detail page
+- Complete pool information:
+  - Total supplied (total deposit volume)
+  - Deposit APY (yield percentage)
+  - Supply cap (deposit limit)
+  - Supply Rate (APR) chart over time
+  - Market Overview with Utilization rate
+  - Collateral parameters (Max LTV, Liquidation threshold, penalty)
+  - E-Mode parameters
+- "My Wallet" section shows:
+  - User balance in this asset
   - Available to deposit / borrow
-  - Кнопки для быстрого депозита/займа
-- Раздел "Your Position" отображает:
-  - Deposited (ваши депозиты)
-  - Profit Earned (заработанный профит в реальном времени с 12 знаками)
-  - Used as Collateral (переключатель)
-  - Borrowed Amount (сумма займа, если есть)
+  - Quick deposit/borrow buttons
+- "Your Position" section displays:
+  - Deposited (your deposits)
+  - Profit Earned (real-time earnings with 12 decimals)
+  - Used as Collateral (toggle)
+  - Borrowed Amount (loan amount, if any)
 
-### 9. Заработок (APY)
-- Депозиты автоматически начисляют проценты в реальном времени
-- Обновление каждую секунду с высокой точностью (12 знаков после запятой)
-- Колонка "Profit" показывает накопленный доход
-- APR для каждого актива отображается в таблице
+### 9. Earnings (APY)
+- Deposits automatically accrue interest in real-time
+- Updates every second with high precision (12 decimal places)
+- "Profit" column shows accumulated earnings
+- APR for each asset is displayed in the table
 
-### 10. Задолженность по займам
-- Проценты по займам также начисляются в реальном времени
-- В разделе "Your Active Borrows" видна текущая задолженность
-- "Interest" показывает накопленные проценты
-- "Total Debt" = Основной долг + Проценты
+### 10. Loan Debt
+- Loan interest also accrues in real-time
+- Current debt is visible in the "Your Active Borrows" section
+- "Interest" shows accumulated interest
+- "Total Debt" = Principal + Interest
 
-### 11. История транзакций
-- Перейдите на вкладку "History" в верхнем меню
-- Полная история всех операций:
-  - Top Up (пополнение)
-  - Deposit (депозит)
-  - Withdraw (вывод)
-  - Borrow (заём)
-  - Repay (возврат)
+### 11. Transaction History
+- Go to the "History" tab in the top menu
+- Complete history of all operations:
+  - Top Up
+  - Deposit
+  - Withdraw
+  - Borrow
+  - Repay
 
-### 12. Фильтрация и поиск
-- Используйте поле поиска для фильтрации по названию актива или сети
-- Кнопки фильтров (Markets, Networks, Collateral Status, Sort by) подготовлены для расширения
+### 12. Filtering and Search
+- Use the search field to filter by asset name or network
+- Filter buttons (Markets, Networks, Collateral Status, Sort by) are prepared for expansion
 
-### 13. Сброс данных
-- Перейдите на вкладку "Settings" в верхнем меню
-- Нажмите "Reset All Data" для полного сброса
+### 13. Data Reset
+- Go to the "Settings" tab in the top menu
+- Click "Reset All Data" for a complete reset
 
-## Технические детали
+## Technical Details
 
-### Архитектура
-- Чистый HTML/CSS/JavaScript без зависимостей
-- Все данные в localStorage
-- Реал-тайм расчёты APY каждую секунду
-- Автоматическая конвертация активов по курсам
+### Architecture
+- Pure HTML/CSS/JavaScript with no dependencies
+- All data in localStorage
+- Real-time APY calculations every second
+- Automatic asset conversion at current rates
 
-### Моковые данные
-Поддерживаемые активы:
+### Mock Data
+Supported assets:
 - ETH (Ethereum)
 - stETH (Ethereum)
 - sUSDS (Gnosis, Ethereum)
@@ -123,13 +123,13 @@
 - fUSDC (Arbitrum)
 - USDS, USDC, DAI, USDT (Ethereum)
 
-### Параметры
-- **LTV (Loan-to-Value)**: 70-85% в зависимости от актива
-- **Минимальная коллатерализация**: 150% (1.5x)
-- **Точность расчётов**: 8 знаков после запятой
-- **Частота обновления**: 1 секунда
+### Parameters
+- **LTV (Loan-to-Value)**: 70-85% depending on asset
+- **Minimum collateralization**: 150% (1.5x)
+- **Calculation precision**: 8 decimal places
+- **Update frequency**: 1 second
 
-### localStorage структура
+### localStorage Structure
 ```javascript
 {
   walletAddress: string,
@@ -160,68 +160,67 @@
 }
 ```
 
-## Примеры использования
+## Usage Examples
 
-### Пример 1: Простой депозит
-1. Подключите кошелёк (автоматическая генерация адреса)
-2. Пополните баланс: 1000 USDC через "Top Up"
-3. Кликните на строку ETH в таблице - откроется детальная страница пула
-4. Нажмите "Deposit" на странице пула
-5. Выберите USDC, введите 500
-6. Подтвердите - получите ~0.118 ETH в депозите
-7. Наблюдайте рост профита в реальном времени (12 знаков после запятой)
+### Example 1: Simple Deposit
+1. Connect wallet (automatic address generation)
+2. Top up balance: 1000 USDC via "Top Up"
+3. Click on ETH row in the table - pool detail page opens
+4. Click "Deposit" on the pool page
+5. Select USDC, enter 500
+6. Confirm - receive ~0.118 ETH in deposit
+7. Watch profit grow in real-time (12 decimal places)
 
-### Пример 2: Заём под коллатерал
-1. Подключите кошелёк
-2. Пополните 10000 USDC
-3. Кликните на ETH пул и депонируйте 10000 USDC
-4. Включите "Use as collateral" переключатель на странице пула
-5. Нажмите "Borrow" на странице пула или перейдите в Borrow
-6. Доступно ~$6666 для займа
-7. Займите 5000 USDS
-8. Наблюдайте рост задолженности в реальном времени
+### Example 2: Collateralized Loan
+1. Connect wallet
+2. Top up 10000 USDC
+3. Click on ETH pool and deposit 10000 USDC
+4. Enable "Use as collateral" toggle on pool page
+5. Click "Borrow" on pool page or go to Borrow tab
+6. ~$6666 available for borrowing
+7. Borrow 5000 USDS
+8. Watch debt grow in real-time
 
-### Пример 3: Заработок на депозитах
-1. Подключите кошелёк
-2. Пополните 10000 USDS
-3. Откройте страницу пула sUSDS (6% APR)
-4. Депонируйте через кнопку на странице пула
-5. Наблюдайте рост профита каждую секунду с точностью 12 знаков
-6. За год заработаете ~600 USDS
+### Example 3: Earning on Deposits
+1. Connect wallet
+2. Top up 10000 USDS
+3. Open sUSDS pool page (6% APR)
+4. Deposit via button on pool page
+5. Watch profit grow every second with 12 decimal precision
+6. Earn ~600 USDS per year
 
-## Браузерная совместимость
+## Browser Compatibility
 
-Работает во всех современных браузерах:
-- Chrome/Edge (рекомендуется)
+Works in all modern browsers:
+- Chrome/Edge (recommended)
 - Firefox
 - Safari
 
-## Ограничения демо
+## Demo Limitations
 
-- Нет реальной интеграции с блокчейном
-- Упрощённая модель ликвидации
-- Фиксированные цены активов
-- Все данные локальные
+- No real blockchain integration
+- Simplified liquidation model
+- Fixed asset prices
+- All data is local
 
-## Новые возможности v2
+## New Features v2
 
-✅ **Реализовано:**
-- Детальные страницы пулов с полной информацией
-- Доnut-график утилизации пула
-- График Supply Rate (APR)
-- Навигация в хедере (убран sidebar)
-- Автоматическая генерация адреса кошелька
-- Высокая точность отображения профита (12 знаков)
-- Клик по строке таблицы открывает страницу пула
-- Интеграция депозит/займ прямо со страницы пула
+✅ **Implemented:**
+- Detailed pool pages with complete information
+- Donut chart for pool utilization
+- Supply Rate (APR) chart
+- Header navigation (sidebar removed)
+- Automatic wallet address generation
+- High precision profit display (12 decimals)
+- Click on table row to open pool page
+- Deposit/borrow integration directly from pool page
 
-## Дополнительные возможности для разработки
+## Additional Development Opportunities
 
-- Реализовать ликвидации при падении коллатерала
-- Добавить больше сетей и активов
-- Интеграция с Web3 wallet providers (MetaMask, WalletConnect)
-- Детальная аналитика портфеля
-- Калькулятор доходности
-- Исторические графики с реальными данными
-- Notifications о важных событиях
-
+- Implement liquidations on collateral drop
+- Add more networks and assets
+- Integration with Web3 wallet providers (MetaMask, WalletConnect)
+- Detailed portfolio analytics
+- Yield calculator
+- Historical charts with real data
+- Important event notifications
