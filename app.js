@@ -602,10 +602,14 @@ class AppState {
             if (deposit) {
                 deposit.amount -= remaining;
                 
-                // Clean up very small deposits
+                // Clean up deposit if amount is zero AND no wallet balance
                 if (deposit.amount < 0.00000001) {
-                    delete this.poolDeposits[poolId];
-                    delete this.collateralEnabled[poolId];
+                    const finalWalletBalance = this.walletBalances[poolId] || 0;
+                    // Only delete if pool asset is completely gone
+                    if (finalWalletBalance < 0.00000001) {
+                        delete this.poolDeposits[poolId];
+                        delete this.collateralEnabled[poolId];
+                    }
                 }
             }
         }
@@ -687,7 +691,7 @@ class AppState {
 
         // Calculate total debt (principal + interest)
         const totalDebt = borrow.amount + borrow.accumulatedInterest;
-        
+
         const isFullRepayment = amount >= totalDebt;
 
         if (isFullRepayment) {
@@ -1571,12 +1575,14 @@ class UI {
             if (balance > 0.00000001) {
                 const asset = MOCK_ASSETS.find(a => a.id === assetId);
                 if (asset && asset.depositApr > 0) {
-                    // Use current time as start time for wallet-only assets
-                    // In real app, we'd track when asset entered wallet
-                    const timeElapsed = 60; // Assume 1 minute for demo purposes
-                    const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
-                    const profit = balance * aprPerSecond * timeElapsed;
-                    totalUserProfit += profit * asset.price;
+                    // Use initialTime from poolDeposits if exists
+                    const deposit = appState.poolDeposits[assetId];
+                    if (deposit && deposit.initialTime) {
+                        const timeElapsed = (Date.now() - deposit.initialTime) / 1000;
+                        const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
+                        const profit = balance * aprPerSecond * timeElapsed;
+                        totalUserProfit += profit * asset.price;
+                    }
                 }
             }
         }
@@ -1609,11 +1615,11 @@ class UI {
             `${assetsWithDeposits} asset${assetsWithDeposits !== 1 ? 's' : ''}`;
 
         document.getElementById('userProfitValue').textContent = 
-            `+$${totalUserProfit.toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3})}`;
+            `+$${totalUserProfit.toLocaleString('en-US', {minimumFractionDigits: 4, maximumFractionDigits: 4})}`;
         
         const profitPercent = totalUserDeposits > 0 ? (totalUserProfit / totalUserDeposits * 100) : 0;
         document.getElementById('userProfitDetail').textContent = 
-            `+${profitPercent.toFixed(3)}%`;
+            `+${formatNumber(profitPercent, 3)}%`;
 
         const healthValueEl = document.getElementById('healthFactorValue');
         healthValueEl.textContent = healthFactor;
@@ -1982,9 +1988,9 @@ class UI {
         // Group deposits by symbol (show deposits + wallet balances for pool assets)
         const depositGroups = new Map();
         
-        // Add deposits
+        // Add deposits (only if deposit.amount > 0)
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
-            if (deposit && deposit.amount > 0) {
+            if (deposit && deposit.amount > 0.00000001) {
                 const asset = MOCK_ASSETS.find(a => a.id === poolId);
                 if (asset) {
                     if (!depositGroups.has(asset.symbol)) {
@@ -2028,10 +2034,14 @@ class UI {
                         // Asset already in deposits - mark that it has wallet balance
                         existingAsset.deposit.walletBalance = balance;
                     } else {
+                        // Check if poolDeposit exists (for initialTime)
+                        const existingDeposit = appState.poolDeposits[assetId];
+                        const initialTime = existingDeposit?.initialTime || Date.now();
+                        
                         // Add new entry for wallet-only balance
                         group.assets.push({ 
                             asset, 
-                            deposit: { amount: 0, initialTime: Date.now(), isWalletOnly: true, walletBalance: balance }
+                            deposit: { amount: 0, initialTime: initialTime, isWalletOnly: true, walletBalance: balance }
                         });
                         if (!group.networks.includes(asset.network)) {
                             group.networks.push(asset.network);
@@ -2052,7 +2062,7 @@ class UI {
             // Recalculate totalAmount and totalUsd including wallet balances for each asset
             let recalcTotalAmount = 0;
             let recalcTotalUsd = 0;
-            
+
             // Calculate profit
             let totalProfit = 0;
             let totalProfitUsd = 0;
@@ -2756,7 +2766,7 @@ class UI {
         if (!repayWithAsset) return;
 
         const totalDebt = parseFloat(document.getElementById('repayTotalDebt').dataset.debtAmount);
-        
+
         // Find borrow for this symbol
         const borrows = appState.borrows.filter(b => !b.repaid);
         const borrow = borrows.find(b => {
@@ -2774,9 +2784,9 @@ class UI {
         if (fullRepay) {
             amount = totalDebt;
             // Convert to repay asset
-            if (repayWithAsset.id !== borrow.assetId) {
-                const usdValue = amount * borrowAsset.price;
-                amountInRepayAsset = usdValue / repayWithAsset.price;
+        if (repayWithAsset.id !== borrow.assetId) {
+            const usdValue = amount * borrowAsset.price;
+            amountInRepayAsset = usdValue / repayWithAsset.price;
             } else {
                 amountInRepayAsset = amount;
             }
@@ -2835,11 +2845,15 @@ class UI {
             delete appState.walletBalances[repayWithAssetId];
             if (deposit) {
                 deposit.amount -= fromDeposit;
-                // Remove deposit if amount becomes very small or negative
+                // Remove deposit if amount becomes very small AND no wallet balance
                 if (deposit.amount < 0.00000001) {
-                    delete appState.poolDeposits[repayWithAssetId];
-                    // Also disable collateral for this asset
-                    delete appState.collateralEnabled[repayWithAssetId];
+                    const finalWalletBalance = appState.walletBalances[repayWithAssetId] || 0;
+                    // Only delete if pool asset is completely gone
+                    if (finalWalletBalance < 0.00000001) {
+                        delete appState.poolDeposits[repayWithAssetId];
+                        // Also disable collateral for this asset
+                        delete appState.collateralEnabled[repayWithAssetId];
+                    }
                 }
             }
         }
@@ -3103,18 +3117,18 @@ class UI {
         MOCK_ASSETS.forEach(asset => {
             // Only show pool assets, not regular stablecoins
             if (asset.depositApr > 0) {
-                if (!poolGroups.has(asset.symbol)) {
-                    poolGroups.set(asset.symbol, {
-                        symbol: asset.symbol,
-                        name: asset.name,
-                        icon: asset.icon,
-                        networks: []
-                    });
-                }
-                poolGroups.get(asset.symbol).networks.push({
-                    network: asset.network,
-                    id: asset.id
+            if (!poolGroups.has(asset.symbol)) {
+                poolGroups.set(asset.symbol, {
+                    symbol: asset.symbol,
+                    name: asset.name,
+                    icon: asset.icon,
+                    networks: []
                 });
+            }
+            poolGroups.get(asset.symbol).networks.push({
+                network: asset.network,
+                id: asset.id
+            });
             }
         });
 
@@ -4150,7 +4164,7 @@ class UI {
         }
     }
 
-    animateValue(element, start, end, duration, decimals, suffix) {
+    animateValue(element, start, end, duration, decimals, suffix, useFormatting = true) {
         const startTime = performance.now();
         const difference = end - start;
 
@@ -4162,7 +4176,11 @@ class UI {
             const easeOutQuart = 1 - Math.pow(1 - progress, 4);
             const current = start + (difference * easeOutQuart);
             
+            if (useFormatting) {
+                element.textContent = formatToken(current, decimals) + suffix;
+            } else {
             element.textContent = current.toFixed(decimals) + suffix;
+            }
             
             if (progress < 1) {
                 requestAnimationFrame(step);
@@ -4182,18 +4200,31 @@ class UI {
             const symbol = profitCell.dataset.symbol;
             if (!symbol) return;
             
-            const assetsInGroup = MOCK_ASSETS.filter(a => a.symbol === symbol);
+            const assetsInGroup = MOCK_ASSETS.filter(a => a.symbol === symbol && a.depositApr > 0);
             let totalProfit = 0;
             let totalProfitUsd = 0;
             
             assetsInGroup.forEach(asset => {
                 const deposit = appState.poolDeposits[asset.id];
-                if (deposit && deposit.amount > 0 && deposit.initialTime) {
+                const walletBalance = appState.walletBalances[asset.id] || 0;
+                
+                if (deposit && deposit.initialTime) {
                     const timeElapsed = (Date.now() - deposit.initialTime) / 1000;
                     const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
+                    
+                    // Calculate profit from actual deposit
+                    if (deposit.amount > 0) {
                     const profit = deposit.amount * aprPerSecond * timeElapsed;
                     totalProfit += profit;
                     totalProfitUsd += profit * asset.price;
+                    }
+                    
+                    // Calculate profit from wallet balance
+                    if (walletBalance > 0) {
+                        const profit = walletBalance * aprPerSecond * timeElapsed;
+                        totalProfit += profit;
+                        totalProfitUsd += profit * asset.price;
+                    }
                 }
             });
             
@@ -4207,19 +4238,19 @@ class UI {
                 
                 if (currentValueEl) {
                     const text = currentValueEl.textContent.replace('+', '').replace(symbol, '').trim();
-                    currentValue = parseFloat(text) || 0;
+                    currentValue = parseNumber(text);
                 }
                 if (currentUsdEl) {
                     const text = currentUsdEl.textContent.replace('+$', '').trim();
-                    currentUsd = parseFloat(text) || 0;
+                    currentUsd = parseNumber(text);
                 }
                 
                 // Only update if structure doesn't exist
                 if (!profitCell.querySelector('.profit-value')) {
                     profitCell.innerHTML = `
                         <div class="profit-positive">
-                            <span class="profit-value">+${currentValue.toFixed(8)}</span><span class="profit-symbol"> ${symbol}</span>
-                            <div class="balance-usd">+$<span class="profit-usd-value">${currentUsd.toFixed(4)}</span></div>
+                            <span class="profit-value">+${formatToken(currentValue, 8)}</span><span class="profit-symbol"> ${symbol}</span>
+                            <div class="balance-usd">+$<span class="profit-usd-value">${formatNumber(currentUsd, 4)}</span></div>
                         </div>
                     `;
                 }
@@ -4229,8 +4260,8 @@ class UI {
                 
                 // Animate from current to new value over 4.8 seconds
                 if (valueEl && usdEl) {
-                    this.animateValue(valueEl, currentValue, totalProfit, 4800, 8, '');
-                    this.animateValue(usdEl, currentUsd, totalProfitUsd, 4800, 4, '');
+                    this.animateValue(valueEl, currentValue, totalProfit, 4800, 8, '', true);
+                    this.animateValue(usdEl, currentUsd, totalProfitUsd, 4800, 4, '', true);
                 }
             }
         });
