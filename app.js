@@ -1117,7 +1117,19 @@ class UI {
         if (repayMaxBtn) {
             repayMaxBtn.addEventListener('click', () => {
                 const totalDebt = parseFloat(document.getElementById('repayTotalDebt').dataset.debtAmount) || 0;
-                document.getElementById('repayAmountInput').value = totalDebt.toFixed(8);
+                
+                // Get debt asset price
+                const debtAsset = MOCK_ASSETS.find(a => a.symbol === this.selectedRepaySymbol);
+                const debtAssetPrice = debtAsset ? debtAsset.price : 1;
+                
+                // Get repay-with asset price
+                const repayWithAsset = MOCK_ASSETS.find(a => a.id === this.selectedRepayWithAsset);
+                const repayAssetPrice = repayWithAsset ? repayWithAsset.price : 1;
+                
+                // Convert debt amount to repay asset amount
+                const repayAmount = (totalDebt * debtAssetPrice) / repayAssetPrice;
+                
+                document.getElementById('repayAmountInput').value = repayAmount.toFixed(8);
                 this.syncDualInput('repay', 'token');
                 this.updateRepayModal();
             });
