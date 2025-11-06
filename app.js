@@ -435,12 +435,9 @@ class AppState {
 
     connectWallet(address) {
         this.walletAddress = address;
-        // Initialize with small balances
+        // Initialize poolDeposits only for pool assets (depositApr > 0)
         MOCK_ASSETS.forEach(asset => {
-            if (!this.walletBalances[asset.id]) {
-                this.walletBalances[asset.id] = 0;
-            }
-            if (!this.poolDeposits[asset.id]) {
+            if (asset.depositApr > 0 && !this.poolDeposits[asset.id]) {
                 this.poolDeposits[asset.id] = {
                     amount: 0,
                     initialTime: Date.now()
@@ -617,6 +614,14 @@ class AppState {
         const valueInUsd = amount * pool.price;
         const convertedAmount = valueInUsd / toAsset.price;
         this.walletBalances[toAssetId] = (this.walletBalances[toAssetId] || 0) + convertedAmount;
+        
+        // If target asset is a pool asset, create poolDeposit entry for profit tracking
+        if (toAsset.depositApr > 0 && !this.poolDeposits[toAssetId]) {
+            this.poolDeposits[toAssetId] = {
+                amount: 0,
+                initialTime: Date.now()
+            };
+        }
 
         this.addHistory('withdraw', poolId, amount);
         this.saveState();
@@ -659,6 +664,14 @@ class AppState {
 
         // Add borrowed amount to wallet
         this.walletBalances[assetId] = (this.walletBalances[assetId] || 0) + amount;
+        
+        // If borrowed asset is a pool asset, create poolDeposit entry for profit tracking
+        if (asset.depositApr > 0 && !this.poolDeposits[assetId]) {
+            this.poolDeposits[assetId] = {
+                amount: 0,
+                initialTime: Date.now()
+            };
+        }
 
         this.addHistory('borrow', assetId, amount);
         this.saveState();
@@ -1045,7 +1058,7 @@ class UI {
         document.getElementById('topupSubmitBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('topupAmountSidebar').value);
             if (amount && amount > 0) {
-                appState.topUp('rusdc-base', amount);
+                appState.topUp('usdc-base', amount);
                 document.getElementById('topupAmountSidebar').value = '';
                 
                 // Show notification
