@@ -602,29 +602,37 @@ class AppState {
             if (deposit) {
                 deposit.amount -= remaining;
                 
-                // Clean up deposit if amount is zero AND no wallet balance
-                if (deposit.amount < 0.00000001) {
-                    const finalWalletBalance = this.walletBalances[poolId] || 0;
-                    // Only delete if pool asset is completely gone
-                    if (finalWalletBalance < 0.00000001) {
-                        delete this.poolDeposits[poolId];
-                        delete this.collateralEnabled[poolId];
-                    }
+                // Clean up deposit if USD value < $0.01
+                const depositUsdValue = deposit.amount * pool.price;
+                const walletUsdValue = (this.walletBalances[poolId] || 0) * pool.price;
+                const totalUsdValue = depositUsdValue + walletUsdValue;
+                
+                if (totalUsdValue < 0.01) {
+                    delete this.poolDeposits[poolId];
+                    delete this.walletBalances[poolId];
+                    delete this.collateralEnabled[poolId];
                 }
             }
         }
 
-        // Convert and add to target wallet
+        // Convert amount
         const valueInUsd = amount * pool.price;
         const convertedAmount = valueInUsd / toAsset.price;
-        this.walletBalances[toAssetId] = (this.walletBalances[toAssetId] || 0) + convertedAmount;
         
-        // If target asset is a pool asset, create poolDeposit entry for profit tracking
-        if (toAsset.depositApr > 0 && !this.poolDeposits[toAssetId]) {
-            this.poolDeposits[toAssetId] = {
-                amount: 0,
-                initialTime: Date.now()
-            };
+        // If target is a pool asset (depositApr > 0), add to poolDeposits
+        // Otherwise add to wallet
+        if (toAsset.depositApr > 0) {
+            // This is a deposit into target pool
+            if (!this.poolDeposits[toAssetId]) {
+                this.poolDeposits[toAssetId] = {
+                    amount: 0,
+                    initialTime: Date.now()
+                };
+            }
+            this.poolDeposits[toAssetId].amount += convertedAmount;
+        } else {
+            // Regular stablecoin - add to wallet
+            this.walletBalances[toAssetId] = (this.walletBalances[toAssetId] || 0) + convertedAmount;
         }
 
         this.addHistory('withdraw', poolId, amount);
@@ -666,15 +674,20 @@ class AppState {
 
         this.borrows.push(borrow);
 
-        // Add borrowed amount to wallet
-        this.walletBalances[assetId] = (this.walletBalances[assetId] || 0) + amount;
-        
-        // If borrowed asset is a pool asset, create poolDeposit entry for profit tracking
-        if (asset.depositApr > 0 && !this.poolDeposits[assetId]) {
-            this.poolDeposits[assetId] = {
-                amount: 0,
-                initialTime: Date.now()
-            };
+        // If borrowed asset is a pool asset (depositApr > 0), add to poolDeposits
+        // Otherwise add to wallet
+        if (asset.depositApr > 0) {
+            // This is borrowing a pool asset - it becomes a deposit
+            if (!this.poolDeposits[assetId]) {
+                this.poolDeposits[assetId] = {
+                    amount: 0,
+                    initialTime: Date.now()
+                };
+            }
+            this.poolDeposits[assetId].amount += amount;
+        } else {
+            // Regular stablecoin - add to wallet
+            this.walletBalances[assetId] = (this.walletBalances[assetId] || 0) + amount;
         }
 
         this.addHistory('borrow', assetId, amount);
@@ -1988,25 +2001,32 @@ class UI {
         // Group deposits by symbol (show deposits + wallet balances for pool assets)
         const depositGroups = new Map();
         
-        // Add deposits (only if deposit.amount > 0)
+        // Add deposits (only if USD value >= $0.01)
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
-            if (deposit && deposit.amount > 0.00000001) {
+            if (deposit) {
                 const asset = MOCK_ASSETS.find(a => a.id === poolId);
                 if (asset) {
-                    if (!depositGroups.has(asset.symbol)) {
-                        depositGroups.set(asset.symbol, {
-                            assets: [],
-                            totalAmount: 0,
-                            totalUsd: 0,
-                            networks: [],
-                            icon: asset.icon
-                        });
+                    const depositAmount = deposit.amount || 0;
+                    const walletBalance = appState.walletBalances[poolId] || 0;
+                    const totalUsdValue = (depositAmount + walletBalance) * asset.price;
+                    
+                    // Only add if total USD value >= $0.01
+                    if (totalUsdValue >= 0.01) {
+                        if (!depositGroups.has(asset.symbol)) {
+                            depositGroups.set(asset.symbol, {
+                                assets: [],
+                                totalAmount: 0,
+                                totalUsd: 0,
+                                networks: [],
+                                icon: asset.icon
+                            });
+                        }
+                        const group = depositGroups.get(asset.symbol);
+                        group.assets.push({ asset, deposit });
+                        group.totalAmount += depositAmount;
+                        group.totalUsd += depositAmount * asset.price;
+                        group.networks.push(asset.network);
                     }
-                    const group = depositGroups.get(asset.symbol);
-                    group.assets.push({ asset, deposit });
-                    group.totalAmount += deposit.amount;
-                    group.totalUsd += deposit.amount * asset.price;
-                    group.networks.push(asset.network);
                 }
             }
         }
@@ -2016,35 +2036,39 @@ class UI {
             if (balance > 0.00000001) {
                 const asset = MOCK_ASSETS.find(a => a.id === assetId);
                 if (asset && asset.depositApr > 0) {
-                    // This is a pool asset - show it in deposits table
-                    if (!depositGroups.has(asset.symbol)) {
-                        depositGroups.set(asset.symbol, {
-                            assets: [],
-                            totalAmount: 0,
-                            totalUsd: 0,
-                            networks: [],
-                            icon: asset.icon
-                        });
-                    }
-                    const group = depositGroups.get(asset.symbol);
-                    
-                    // Check if already added from poolDeposits
-                    const existingAsset = group.assets.find(a => a.asset.id === assetId);
-                    if (existingAsset) {
-                        // Asset already in deposits - mark that it has wallet balance
-                        existingAsset.deposit.walletBalance = balance;
-                    } else {
-                        // Check if poolDeposit exists (for initialTime)
-                        const existingDeposit = appState.poolDeposits[assetId];
-                        const initialTime = existingDeposit?.initialTime || Date.now();
+                    // Only add if USD value >= $0.01
+                    const usdValue = balance * asset.price;
+                    if (usdValue >= 0.01) {
+                        // This is a pool asset - show it in deposits table
+                        if (!depositGroups.has(asset.symbol)) {
+                            depositGroups.set(asset.symbol, {
+                                assets: [],
+                                totalAmount: 0,
+                                totalUsd: 0,
+                                networks: [],
+                                icon: asset.icon
+                            });
+                        }
+                        const group = depositGroups.get(asset.symbol);
                         
-                        // Add new entry for wallet-only balance
-                        group.assets.push({ 
-                            asset, 
-                            deposit: { amount: 0, initialTime: initialTime, isWalletOnly: true, walletBalance: balance }
-                        });
-                        if (!group.networks.includes(asset.network)) {
-                            group.networks.push(asset.network);
+                        // Check if already added from poolDeposits
+                        const existingAsset = group.assets.find(a => a.asset.id === assetId);
+                        if (existingAsset) {
+                            // Asset already in deposits - mark that it has wallet balance
+                            existingAsset.deposit.walletBalance = balance;
+                        } else {
+                            // Check if poolDeposit exists (for initialTime)
+                            const existingDeposit = appState.poolDeposits[assetId];
+                            const initialTime = existingDeposit?.initialTime || Date.now();
+                            
+                            // Add new entry for wallet-only balance
+                            group.assets.push({ 
+                                asset, 
+                                deposit: { amount: 0, initialTime: initialTime, isWalletOnly: true, walletBalance: balance }
+                            });
+                            if (!group.networks.includes(asset.network)) {
+                                group.networks.push(asset.network);
+                            }
                         }
                     }
                 }
@@ -2099,8 +2123,8 @@ class UI {
             group.totalAmount = recalcTotalAmount;
             group.totalUsd = recalcTotalUsd;
             
-            // Skip groups with zero or negligible balance
-            if (group.totalAmount < 0.00000001) {
+            // Skip groups with balance less than $0.01
+            if (group.totalUsd < 0.01) {
                 return;
             }
 
@@ -2121,6 +2145,10 @@ class UI {
             }
             networksHtml += '</div>';
 
+            // Check if stablecoin (use 2 decimals for stablecoins, 6 for others)
+            const isStablecoin = symbol.includes('USD') || symbol.includes('DAI');
+            const balanceDecimals = isStablecoin ? 2 : 6;
+            
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
@@ -2137,7 +2165,7 @@ class UI {
                 <td>${networksHtml}</td>
                 <td>
                     <div class="metric-cell">
-                        <span class="metric-value">${formatToken(group.totalAmount, 6)} ${symbol}</span>
+                        <span class="metric-value">${formatToken(group.totalAmount, balanceDecimals)} ${symbol}</span>
                         <span class="metric-usd">$${formatCurrency(group.totalUsd)}</span>
                     </div>
                 </td>
@@ -2283,6 +2311,11 @@ class UI {
             }
             networksHtml += '</div>';
 
+            // Check if stablecoin (use 2 decimals for stablecoins, 6 for others)
+            const isStablecoin = symbol.includes('USD') || symbol.includes('DAI');
+            const balanceDecimals = isStablecoin ? 2 : 6;
+            const debtDecimals = isStablecoin ? 2 : 8;
+
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
@@ -2299,7 +2332,7 @@ class UI {
                 <td>${networksHtml}</td>
                 <td>
                     <div class="metric-cell">
-                        <span class="metric-value">${formatToken(group.totalAmount, 6)} ${symbol}</span>
+                        <span class="metric-value">${formatToken(group.totalAmount, balanceDecimals)} ${symbol}</span>
                         <span class="metric-usd">$${formatCurrency(group.totalAmount * firstAsset.price)}</span>
                     </div>
                 </td>
@@ -2308,7 +2341,7 @@ class UI {
                 </td>
                 <td class="debt-cell" data-symbol="${symbol}">
                     <div class="profit-negative">
-                        <span class="debt-value">${formatToken(group.totalDebt, 8)}</span><span class="debt-symbol"> ${symbol}</span>
+                        <span class="debt-value">${formatToken(group.totalDebt, debtDecimals)}</span><span class="debt-symbol"> ${symbol}</span>
                         <div class="balance-usd">$<span class="debt-usd-value">${formatNumber(totalDebtUsd, 4)}</span></div>
                     </div>
                 </td>
@@ -2498,12 +2531,16 @@ class UI {
         const collateralDropdown = document.getElementById('collateralDropdown');
         collateralDropdown.innerHTML = '';
 
-        // Get all deposits with collateral enabled
+        // Get all pool assets that can be used as collateral (deposits + wallet)
         let hasCollateralItems = false;
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
-            if (deposit && deposit.amount > 0 && appState.collateralEnabled[poolId]) {
+            if (deposit && appState.collateralEnabled[poolId]) {
                 const collAsset = MOCK_ASSETS.find(a => a.id === poolId);
-                if (collAsset) {
+                const depositAmount = deposit.amount || 0;
+                const walletAmount = appState.walletBalances[poolId] || 0;
+                const totalAmount = depositAmount + walletAmount;
+                
+                if (collAsset && totalAmount > 0) {
                     hasCollateralItems = true;
                     const item = document.createElement('div');
                     item.className = 'collateral-item';
@@ -2845,15 +2882,16 @@ class UI {
             delete appState.walletBalances[repayWithAssetId];
             if (deposit) {
                 deposit.amount -= fromDeposit;
-                // Remove deposit if amount becomes very small AND no wallet balance
-                if (deposit.amount < 0.00000001) {
-                    const finalWalletBalance = appState.walletBalances[repayWithAssetId] || 0;
-                    // Only delete if pool asset is completely gone
-                    if (finalWalletBalance < 0.00000001) {
-                        delete appState.poolDeposits[repayWithAssetId];
-                        // Also disable collateral for this asset
-                        delete appState.collateralEnabled[repayWithAssetId];
-                    }
+                
+                // Clean up if total USD value < $0.01
+                const depositUsdValue = deposit.amount * repayWithAsset.price;
+                const walletUsdValue = (appState.walletBalances[repayWithAssetId] || 0) * repayWithAsset.price;
+                const totalUsdValue = depositUsdValue + walletUsdValue;
+                
+                if (totalUsdValue < 0.01) {
+                    delete appState.poolDeposits[repayWithAssetId];
+                    delete appState.walletBalances[repayWithAssetId];
+                    delete appState.collateralEnabled[repayWithAssetId];
                 }
             }
         }
@@ -3039,28 +3077,36 @@ class UI {
 
         // Add deposits (group by assetId, not symbol)
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
-            if (deposit && deposit.amount > 0) {
+            if (deposit && deposit.amount > 0.00000001) {
                 const pool = MOCK_ASSETS.find(a => a.id === poolId);
                 if (pool) {
-                    const existing = assetsMap.get(pool.id) || { amount: 0, usd: 0 };
-                    existing.amount += deposit.amount;
-                    existing.usd += deposit.amount * pool.price;
-                    existing.asset = pool;
-                    assetsMap.set(pool.id, existing);
+                    const usdValue = deposit.amount * pool.price;
+                    // Only add if USD value >= $0.01
+                    if (usdValue >= 0.01) {
+                        const existing = assetsMap.get(pool.id) || { amount: 0, usd: 0 };
+                        existing.amount += deposit.amount;
+                        existing.usd += usdValue;
+                        existing.asset = pool;
+                        assetsMap.set(pool.id, existing);
+                    }
                 }
             }
         }
 
         // Add wallet balances (group by assetId, not symbol)
         for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
-            if (balance > 0) {
+            if (balance > 0.00000001) {
                 const asset = MOCK_ASSETS.find(a => a.id === assetId);
                 if (asset) {
-                    const existing = assetsMap.get(asset.id) || { amount: 0, usd: 0 };
-                    existing.amount += balance;
-                    existing.usd += balance * asset.price;
-                    existing.asset = asset;
-                    assetsMap.set(asset.id, existing);
+                    const usdValue = balance * asset.price;
+                    // Only add if USD value >= $0.01
+                    if (usdValue >= 0.01) {
+                        const existing = assetsMap.get(asset.id) || { amount: 0, usd: 0 };
+                        existing.amount += balance;
+                        existing.usd += usdValue;
+                        existing.asset = asset;
+                        assetsMap.set(asset.id, existing);
+                    }
                 }
             }
         }
@@ -3076,6 +3122,10 @@ class UI {
                 const change = Math.random() * 20 - 10; // Mock change percentage
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 const changeSign = change >= 0 ? '+' : '';
+                
+                // Check if stablecoin (use 2 decimals for stablecoins, 6 for others)
+                const isStablecoin = symbol.includes('USD') || symbol.includes('DAI');
+                const balanceDecimals = isStablecoin ? 2 : 6;
 
                 const assetItem = document.createElement('div');
                 assetItem.className = 'wallet-asset-item';
@@ -3086,7 +3136,7 @@ class UI {
                     </div>
                     <div class="wallet-asset-info">
                         <span class="wallet-asset-name">${symbol}</span>
-                        <span class="wallet-asset-balance">${formatToken(data.amount, 6)} ${symbol}</span>
+                        <span class="wallet-asset-balance">${formatToken(data.amount, balanceDecimals)} ${symbol}</span>
                     </div>
                     <div class="wallet-asset-value">
                         <span class="wallet-asset-usd">$${formatCurrency(data.usd)}</span>
