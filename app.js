@@ -147,13 +147,13 @@ const MOCK_ASSETS = [
         network: 'Ethereum Network',
         icon: 'crypto/assets/usds.svg',
         assetType: 'stable',
-        depositApr: 5.5,
-        borrowApr: 8.0,
+        depositApr: 0,
+        borrowApr: 0,
         price: 1,
-        canBeCollateral: true,
-        ltv: 0.75,
-        totalSupplied: 1567890.45,
-        totalBorrowed: 890123.67
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
     },
     {
         id: 'usdc-ethereum',
@@ -162,13 +162,73 @@ const MOCK_ASSETS = [
         network: 'Ethereum Network',
         icon: 'crypto/assets/usdc.svg',
         assetType: 'stable',
-        depositApr: 4.0,
-        borrowApr: 7.0,
+        depositApr: 0,
+        borrowApr: 0,
         price: 1,
-        canBeCollateral: true,
-        ltv: 0.80,
-        totalSupplied: 2345678.90,
-        totalBorrowed: 1234567.89
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
+    },
+    {
+        id: 'usdc-base',
+        symbol: 'USDC',
+        name: 'USDC',
+        network: 'Base',
+        icon: 'crypto/assets/usdc.svg',
+        assetType: 'stable',
+        depositApr: 0,
+        borrowApr: 0,
+        price: 1,
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
+    },
+    {
+        id: 'usdc-arbitrum',
+        symbol: 'USDC',
+        name: 'USDC',
+        network: 'Arbitrum',
+        icon: 'crypto/assets/usdc.svg',
+        assetType: 'stable',
+        depositApr: 0,
+        borrowApr: 0,
+        price: 1,
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
+    },
+    {
+        id: 'usdc-avalanche',
+        symbol: 'USDC',
+        name: 'USDC',
+        network: 'Avalanche',
+        icon: 'crypto/assets/usdc.svg',
+        assetType: 'stable',
+        depositApr: 0,
+        borrowApr: 0,
+        price: 1,
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
+    },
+    {
+        id: 'usdc-optimism',
+        symbol: 'USDC',
+        name: 'USDC',
+        network: 'Optimism',
+        icon: 'crypto/assets/usdc.svg',
+        assetType: 'stable',
+        depositApr: 0,
+        borrowApr: 0,
+        price: 1,
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
     },
     {
         id: 'dai-ethereum',
@@ -177,13 +237,13 @@ const MOCK_ASSETS = [
         network: 'Ethereum Network',
         icon: 'crypto/assets/sdai.svg',
         assetType: 'stable',
-        depositApr: 3.5,
-        borrowApr: 6.5,
+        depositApr: 0,
+        borrowApr: 0,
         price: 1,
-        canBeCollateral: true,
-        ltv: 0.75,
-        totalSupplied: 1890123.45,
-        totalBorrowed: 789012.34
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
     },
     {
         id: 'usdt-ethereum',
@@ -192,13 +252,13 @@ const MOCK_ASSETS = [
         network: 'Ethereum Network',
         icon: 'crypto/assets/usdt.png',
         assetType: 'stable',
-        depositApr: 3.8,
-        borrowApr: 6.8,
+        depositApr: 0,
+        borrowApr: 0,
         price: 1,
-        canBeCollateral: true,
-        ltv: 0.80,
-        totalSupplied: 2456789.12,
-        totalBorrowed: 1267890.23
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
     },
     {
         id: 'usdt-avalanche',
@@ -207,13 +267,13 @@ const MOCK_ASSETS = [
         network: 'Avalanche',
         icon: 'crypto/assets/usdt.png',
         assetType: 'stable',
-        depositApr: 4.2,
-        borrowApr: 7.1,
+        depositApr: 0,
+        borrowApr: 0,
         price: 1,
-        canBeCollateral: true,
-        ltv: 0.80,
-        totalSupplied: 1000000.00,
-        totalBorrowed: 300000.00
+        canBeCollateral: false,
+        ltv: 0,
+        totalSupplied: 0,
+        totalBorrowed: 0
     },
     {
         id: 'weeth-ethereum',
@@ -452,9 +512,16 @@ class AppState {
         const deposit = this.poolDeposits[poolId];
         if (!deposit || deposit.amount < amount) return false;
 
-        // Check if used as collateral and has active borrows
+        // Check if used as collateral and has active borrows with meaningful debt
         if (this.collateralEnabled[poolId]) {
-            const activeBorrows = this.borrows.filter(b => !b.repaid);
+            const activeBorrows = this.borrows.filter(b => {
+                if (b.repaid) return false;
+                const asset = MOCK_ASSETS.find(a => a.id === b.assetId);
+                if (!asset) return false;
+                const debt = b.amount + b.accumulatedInterest;
+                return (debt * asset.price) >= 0.01; // Only check if debt >= $0.01
+            });
+            
             if (activeBorrows.length > 0) {
                 const totalCollateralValue = this.getTotalCollateralValue();
                 const withdrawValue = amount * pool.price;
@@ -485,12 +552,26 @@ class AppState {
         const toAsset = MOCK_ASSETS.find(a => a.id === toAssetId);
         if (!pool || !toAsset) return false;
 
-        const deposit = this.poolDeposits[poolId];
-        if (!deposit || deposit.amount < amount) return false;
+        // Get total available balance (deposits + wallet)
+        const depositAmount = this.poolDeposits[poolId]?.amount || 0;
+        const walletAmount = this.walletBalances[poolId] || 0;
+        const totalAvailable = depositAmount + walletAmount;
+        
+        if (totalAvailable < amount) {
+            alert('Insufficient balance');
+            return false;
+        }
 
-        // Check if used as collateral and has active borrows
+        // Check if used as collateral and has active borrows with meaningful debt
         if (this.collateralEnabled[poolId]) {
-            const activeBorrows = this.borrows.filter(b => !b.repaid);
+            const activeBorrows = this.borrows.filter(b => {
+                if (b.repaid) return false;
+                const asset = MOCK_ASSETS.find(a => a.id === b.assetId);
+                if (!asset) return false;
+                const debt = b.amount + b.accumulatedInterest;
+                return (debt * asset.price) >= 0.01; // Only check if debt >= $0.01
+            });
+            
             if (activeBorrows.length > 0) {
                 const totalCollateralValue = this.getTotalCollateralValue();
                 const withdrawValue = amount * pool.price;
@@ -505,16 +586,34 @@ class AppState {
             }
         }
 
-        // Deduct from pool
-        deposit.amount -= amount;
+        // Deduct from wallet first, then from deposit
+        let remaining = amount;
         
-        // Clean up very small deposits
-        if (deposit.amount < 0.00000001) {
-            delete this.poolDeposits[poolId];
-            delete this.collateralEnabled[poolId];
+        if (walletAmount > 0) {
+            const fromWallet = Math.min(walletAmount, remaining);
+            this.walletBalances[poolId] -= fromWallet;
+            remaining -= fromWallet;
+            
+            // Clean up very small wallet balances
+            if (this.walletBalances[poolId] < 0.00000001) {
+                delete this.walletBalances[poolId];
+            }
+        }
+        
+        if (remaining > 0 && depositAmount > 0) {
+            const deposit = this.poolDeposits[poolId];
+            if (deposit) {
+                deposit.amount -= remaining;
+                
+                // Clean up very small deposits
+                if (deposit.amount < 0.00000001) {
+                    delete this.poolDeposits[poolId];
+                    delete this.collateralEnabled[poolId];
+                }
+            }
         }
 
-        // Convert and add to wallet
+        // Convert and add to target wallet
         const valueInUsd = amount * pool.price;
         const convertedAmount = valueInUsd / toAsset.price;
         this.walletBalances[toAssetId] = (this.walletBalances[toAssetId] || 0) + convertedAmount;
@@ -534,13 +633,14 @@ class AppState {
         if (!asset) return false;
 
         // Check collateral
-        const totalCollateralValue = this.getTotalCollateralValue();
+        const totalCollateralValue = this.getTotalCollateralValue(); // Already includes LTV
         const borrowValue = amount * asset.price;
         const currentBorrowValue = this.getTotalBorrowValue();
         const newTotalBorrow = currentBorrowValue + borrowValue;
 
-        // Require 150% collateralization
-        if (totalCollateralValue < newTotalBorrow * 1.5) {
+        // Check if collateral with LTV is sufficient for the new total borrow
+        // totalCollateralValue already accounts for LTV (e.g., 0.80 means max 80% can be borrowed)
+        if (totalCollateralValue < newTotalBorrow) {
             alert('Insufficient collateral for borrow');
             return false;
         }
@@ -589,6 +689,12 @@ class AppState {
             } else {
                 borrow.accumulatedInterest -= amount;
             }
+            
+            // Check if remaining debt is negligible (< $0.01) and mark as repaid
+            const remainingDebt = borrow.amount + borrow.accumulatedInterest;
+            if (remainingDebt * asset.price < 0.01) {
+                borrow.repaid = true;
+            }
         }
 
         // Note: Balance deduction is handled in executeRepay(), not here
@@ -597,7 +703,7 @@ class AppState {
         this.addHistory('repay', borrow.assetId, amount);
         
         // Auto-disable collateral if loan is fully repaid and no other active loans
-        if (isFullRepayment) {
+        if (isFullRepayment || borrow.repaid) {
             this.checkAndReleaseCollateral();
         }
         
@@ -622,9 +728,15 @@ class AppState {
         for (const [poolId, enabled] of Object.entries(this.collateralEnabled)) {
             if (enabled) {
                 const pool = MOCK_ASSETS.find(a => a.id === poolId);
-                const deposit = this.poolDeposits[poolId];
-                if (pool && deposit && deposit.amount > 0) {
-                    total += deposit.amount * pool.price * pool.ltv;
+                if (pool) {
+                    // Count both poolDeposit and walletBalance
+                    const depositAmount = this.poolDeposits[poolId]?.amount || 0;
+                    const walletAmount = this.walletBalances[poolId] || 0;
+                    const totalAmount = depositAmount + walletAmount;
+                    
+                    if (totalAmount > 0) {
+                        total += totalAmount * pool.price * pool.ltv;
+                    }
                 }
             }
         }
@@ -706,6 +818,34 @@ class AppState {
             this.saveState();
         }
     }
+}
+
+// Helper function to parse numbers with both comma and dot as decimal separator
+function parseNumber(value) {
+    if (typeof value === 'number') return value;
+    if (!value) return 0;
+    // Replace comma with dot for parsing
+    const normalized = String(value).replace(',', '.');
+    return parseFloat(normalized) || 0;
+}
+
+// Helper function to format numbers with thousand separators
+function formatNumber(value, decimals = 2) {
+    if (value === null || value === undefined || isNaN(value)) return '0.00';
+    return value.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+// Helper function to format currency (always 2 decimals)
+function formatCurrency(value) {
+    return formatNumber(value, 2);
+}
+
+// Helper function to format token amounts (6-8 decimals)
+function formatToken(value, decimals = 6) {
+    return formatNumber(value, decimals);
 }
 
 // Initialize App State
@@ -1013,7 +1153,7 @@ class UI {
         document.getElementById('confirmDepositBtn').addEventListener('click', () => {
             const poolId = this.selectedPoolForDeposit;
             const fromAssetId = this.selectedFromAssetForDeposit;
-            const amount = parseFloat(document.getElementById('depositAmountInput').value);
+            const amount = parseNumber(document.getElementById('depositAmountInput').value);
 
             if (!poolId || !fromAssetId) {
                 alert('Please select pool and asset');
@@ -1052,8 +1192,16 @@ class UI {
         });
 
         // Withdraw Modal
-        this.initializeCustomDropdown('withdrawToAsset', (assetId) => {
-            this.selectedWithdrawToAsset = assetId;
+        this.initializeCustomDropdown('withdrawToAsset', (symbol) => {
+            this.selectedWithdrawToSymbol = symbol;
+            this.updateWithdrawToNetworkSelector();
+            this.updateActualWithdrawToAssetSelection();
+            this.updateWithdrawPreview();
+        });
+        
+        this.initializeCustomDropdown('withdrawToNetwork', (network) => {
+            this.selectedWithdrawToNetwork = network;
+            this.updateActualWithdrawToAssetSelection();
             this.updateWithdrawPreview();
         });
         
@@ -1069,9 +1217,13 @@ class UI {
 
         document.getElementById('withdrawMaxBtn').addEventListener('click', () => {
             if (this.selectedPoolForWithdraw) {
-                const deposit = appState.poolDeposits[this.selectedPoolForWithdraw];
-                if (deposit) {
-                    document.getElementById('withdrawAmountInput').value = deposit.amount.toFixed(8);
+                // Get total available (deposits + wallet)
+                const depositAmount = appState.poolDeposits[this.selectedPoolForWithdraw]?.amount || 0;
+                const walletAmount = appState.walletBalances[this.selectedPoolForWithdraw] || 0;
+                const totalAvailable = depositAmount + walletAmount;
+                
+                if (totalAvailable > 0) {
+                    document.getElementById('withdrawAmountInput').value = totalAvailable.toFixed(8);
                     this.syncDualInput('withdraw', 'token');
                     this.updateWithdrawPreview();
                 }
@@ -1079,7 +1231,7 @@ class UI {
         });
 
         document.getElementById('confirmWithdrawBtn').addEventListener('click', () => {
-            const amount = parseFloat(document.getElementById('withdrawAmountInput').value);
+            const amount = parseNumber(document.getElementById('withdrawAmountInput').value);
             const toAssetId = this.selectedWithdrawToAsset;
             
             if (!toAssetId) {
@@ -1150,18 +1302,21 @@ class UI {
                     return;
                 }
 
-                let totalSelectedCollateral = 0;
+                let totalSelectedCollateralValue = 0;
                 selectedCollateralItems.forEach(item => {
                     const poolId = item.dataset.assetId;
                     const deposit = appState.poolDeposits[poolId];
                     const collAsset = MOCK_ASSETS.find(a => a.id === poolId);
                     if (deposit && collAsset) {
-                        totalSelectedCollateral += deposit.amount * collAsset.price * collAsset.ltv;
+                        // Calculate collateral value with LTV
+                        totalSelectedCollateralValue += deposit.amount * collAsset.price * collAsset.ltv;
                     }
                 });
 
                 const currentBorrow = appState.getTotalBorrowValue();
-                const maxBorrow = Math.max(0, totalSelectedCollateral / 1.5 - currentBorrow);
+                // Max borrow = collateral value with LTV - current borrows
+                // No need to divide by 1.5 because LTV already limits borrowing
+                const maxBorrow = Math.max(0, totalSelectedCollateralValue - currentBorrow);
                 const maxBorrowInAsset = maxBorrow / asset.price;
 
                 document.getElementById('borrowAmountInput').value = maxBorrowInAsset.toFixed(6);
@@ -1259,7 +1414,7 @@ class UI {
         // Borrow Page
         document.getElementById('executeBorrowBtn').addEventListener('click', () => {
             const assetId = document.getElementById('borrowAssetSelector').dataset.assetId || 'usds-ethereum';
-            const amount = parseFloat(document.getElementById('borrowAmount').value);
+            const amount = parseNumber(document.getElementById('borrowAmount').value);
 
             if (amount && amount > 0) {
                 if (appState.borrow(assetId, amount)) {
@@ -1354,22 +1509,38 @@ class UI {
     }
 
     renderStatsCards() {
-        // Calculate user deposits
+        // Calculate user deposits (poolDeposits + wallet balance of pool assets)
         let totalUserDeposits = 0;
-        let assetsWithDeposits = 0;
+        const countedAssets = new Set();
         
+        // Count actual deposits
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
             if (deposit && deposit.amount > 0) {
                 const pool = MOCK_ASSETS.find(a => a.id === poolId);
                 if (pool) {
                     totalUserDeposits += deposit.amount * pool.price;
-                    assetsWithDeposits++;
+                    countedAssets.add(pool.symbol);
                 }
             }
         }
+        
+        // Count wallet balance of pool assets
+        for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
+            if (balance > 0.00000001) {
+                const asset = MOCK_ASSETS.find(a => a.id === assetId);
+                if (asset && asset.depositApr > 0) {
+                    totalUserDeposits += balance * asset.price;
+                    countedAssets.add(asset.symbol);
+                }
+            }
+        }
+        
+        const assetsWithDeposits = countedAssets.size;
 
-        // Calculate user profit
+        // Calculate user profit (from actual poolDeposits + wallet balance with time tracking)
         let totalUserProfit = 0;
+        
+        // Profit from poolDeposits
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
             if (deposit && deposit.amount > 0 && deposit.initialTime) {
                 const pool = MOCK_ASSETS.find(a => a.id === poolId);
@@ -1381,6 +1552,21 @@ class UI {
                 }
             }
         }
+        
+        // Profit from wallet balance of pool assets (since they auto-deposit)
+        for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
+            if (balance > 0.00000001) {
+                const asset = MOCK_ASSETS.find(a => a.id === assetId);
+                if (asset && asset.depositApr > 0) {
+                    // Use current time as start time for wallet-only assets
+                    // In real app, we'd track when asset entered wallet
+                    const timeElapsed = 60; // Assume 1 minute for demo purposes
+                    const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
+                    const profit = balance * aprPerSecond * timeElapsed;
+                    totalUserProfit += profit * asset.price;
+                }
+            }
+        }
 
         // Calculate health factor
         const totalCollateral = appState.getTotalCollateralValue();
@@ -1388,13 +1574,15 @@ class UI {
         let healthFactor = '∞';
         let healthClass = '';
         
-        if (totalBorrow > 0) {
+        // Only calculate health factor if debt is meaningful (>= $0.01)
+        if (totalBorrow >= 0.01) {
             const hf = totalCollateral / totalBorrow;
             healthFactor = hf.toFixed(2);
             
-            if (hf >= 2) {
+            // Since totalCollateral includes LTV, hf >= 1.0 means safe
+            if (hf >= 1.2) {
                 healthClass = 'good';
-            } else if (hf >= 1.2) {
+            } else if (hf >= 1.0) {
                 healthClass = 'warning';
             } else {
                 healthClass = 'danger';
@@ -1494,10 +1682,12 @@ class UI {
         }
 
         if (borrowHealthFactorEl && borrowHealthFactorDetailEl) {
-            if (totalBorrow > 0) {
+            // Only calculate health factor if debt is meaningful (>= $0.01)
+            if (totalBorrow >= 0.01) {
                 const hf = totalCollateral / totalBorrow;
                 borrowHealthFactorEl.textContent = hf.toFixed(2);
-                borrowHealthFactorEl.className = 'stats-value health-value ' + (hf >= 2 ? 'good' : hf >= 1.2 ? 'warning' : 'danger');
+                // Since totalCollateral includes LTV, hf >= 1.0 means safe
+                borrowHealthFactorEl.className = 'stats-value health-value ' + (hf >= 1.2 ? 'good' : hf >= 1.0 ? 'warning' : 'danger');
             } else {
                 borrowHealthFactorEl.textContent = '∞';
                 borrowHealthFactorEl.className = 'stats-value health-value';
@@ -1514,6 +1704,9 @@ class UI {
         tbody.innerHTML = '';
 
         let assets = [...MOCK_ASSETS];
+        
+        // Filter out non-pool assets (depositApr = 0 and borrowApr = 0)
+        assets = assets.filter(a => a.depositApr > 0 || a.borrowApr > 0);
 
         // Filter by asset type
         if (this.selectedAssetType && this.selectedAssetType !== 'all') {
@@ -1704,7 +1897,7 @@ class UI {
                     </div>
                 </td>
                 <td>
-                    <span class="apr-value">${groupedAsset.avgDepositApr < 0.01 ? '<0.01' : groupedAsset.avgDepositApr.toFixed(2)}%</span>
+                    <span class="apr-value">${groupedAsset.avgDepositApr < 0.01 ? '<0.01' : formatNumber(groupedAsset.avgDepositApr, 2)}%</span>
                 </td>
                 <td>
                     <div class="metric-cell">
@@ -1713,7 +1906,7 @@ class UI {
                         </div>
                 </td>
                 <td>
-                    <span class="apr-value">${groupedAsset.avgBorrowApr < 0.01 ? '<0.01' : groupedAsset.avgBorrowApr.toFixed(2)}%</span>
+                    <span class="apr-value">${groupedAsset.avgBorrowApr < 0.01 ? '<0.01' : formatNumber(groupedAsset.avgBorrowApr, 2)}%</span>
                 </td>
                 <td>
                     <button class="btn btn-primary" onclick="event.stopPropagation(); ui.openDepositModal('${groupedAsset.id}')">
@@ -1799,32 +1992,38 @@ class UI {
             }
         }
         
-        // Add pool assets from wallet balances (if not already in deposits)
+        // Add pool assets from wallet balances
         for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
             if (balance > 0.00000001) {
                 const asset = MOCK_ASSETS.find(a => a.id === assetId);
-                if (asset) {
-                    // Check if this asset is already in deposits
-                    const existingDeposit = appState.poolDeposits[assetId];
-                    if (!existingDeposit || existingDeposit.amount < 0.00000001) {
-                        // Only add if it's a pool asset (not a stablecoin)
-                        if (asset.depositApr > 0) {
-                            if (!depositGroups.has(asset.symbol)) {
-                                depositGroups.set(asset.symbol, {
-                                    assets: [],
-                                    totalAmount: 0,
-                                    totalUsd: 0,
-                                    networks: [],
-                                    icon: asset.icon
-                                });
-                            }
-                            const group = depositGroups.get(asset.symbol);
-                            // Create a pseudo-deposit for wallet balance
-                            group.assets.push({ 
-                                asset, 
-                                deposit: { amount: 0, initialTime: Date.now(), isWalletOnly: true }
-                            });
-                            // Don't add to totalAmount since it's in wallet, not deposited
+                if (asset && asset.depositApr > 0) {
+                    // This is a pool asset - show it in deposits table
+                    if (!depositGroups.has(asset.symbol)) {
+                        depositGroups.set(asset.symbol, {
+                            assets: [],
+                            totalAmount: 0,
+                            totalUsd: 0,
+                            networks: [],
+                            icon: asset.icon
+                        });
+                    }
+                    const group = depositGroups.get(asset.symbol);
+                    
+                    // Check if already added from poolDeposits
+                    const existingAsset = group.assets.find(a => a.asset.id === assetId);
+                    if (existingAsset) {
+                        // Asset already in deposits - add wallet balance to total
+                        group.totalAmount += balance;
+                        group.totalUsd += balance * asset.price;
+                    } else {
+                        // Add new entry for wallet-only balance
+                        group.assets.push({ 
+                            asset, 
+                            deposit: { amount: 0, initialTime: Date.now(), isWalletOnly: true, walletBalance: balance }
+                        });
+                        group.totalAmount += balance;
+                        group.totalUsd += balance * asset.price;
+                        if (!group.networks.includes(asset.network)) {
                             group.networks.push(asset.network);
                         }
                     }
@@ -1840,18 +2039,50 @@ class UI {
         depositGroups.forEach((group, symbol) => {
             const firstAsset = group.assets[0].asset;
 
+            // Recalculate totalAmount and totalUsd including wallet balances for each asset
+            let recalcTotalAmount = 0;
+            let recalcTotalUsd = 0;
+            
             // Calculate profit
             let totalProfit = 0;
             let totalProfitUsd = 0;
             group.assets.forEach(({asset, deposit}) => {
-                if (deposit.initialTime) {
+                // Get actual amount (deposit + wallet for this specific asset)
+                const depositAmt = deposit.amount || 0;
+                const walletAmt = deposit.isWalletOnly ? (deposit.walletBalance || 0) : (appState.walletBalances[asset.id] || 0);
+                const actualAmount = depositAmt + walletAmt;
+                
+                recalcTotalAmount += actualAmount;
+                recalcTotalUsd += actualAmount * asset.price;
+                
+                // Calculate profit from poolDeposits
+                if (deposit.initialTime && depositAmt > 0) {
                     const timeElapsed = (Date.now() - deposit.initialTime) / 1000;
                     const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
-                    const profit = deposit.amount * aprPerSecond * timeElapsed;
+                    const profit = depositAmt * aprPerSecond * timeElapsed;
+                    totalProfit += profit;
+                    totalProfitUsd += profit * asset.price;
+                }
+                
+                // Calculate profit from wallet balance (auto-earning)
+                if (walletAmt > 0 && asset.depositApr > 0) {
+                    // Assume wallet balance earns from creation time
+                    const timeElapsed = deposit.initialTime ? (Date.now() - deposit.initialTime) / 1000 : 60;
+                    const aprPerSecond = asset.depositApr / 100 / (365 * 24 * 60 * 60);
+                    const profit = walletAmt * aprPerSecond * timeElapsed;
                     totalProfit += profit;
                     totalProfitUsd += profit * asset.price;
                 }
             });
+            
+            // Update group totals
+            group.totalAmount = recalcTotalAmount;
+            group.totalUsd = recalcTotalUsd;
+            
+            // Skip groups with zero or negligible balance
+            if (group.totalAmount < 0.00000001) {
+                return;
+            }
 
             // Calculate average APY
             const avgApy = group.assets.reduce((sum, {asset}) => sum + asset.depositApr, 0) / group.assets.length;
@@ -1886,17 +2117,17 @@ class UI {
                 <td>${networksHtml}</td>
                 <td>
                     <div class="metric-cell">
-                        <span class="metric-value">${group.totalAmount.toFixed(6)} ${symbol}</span>
-                        <span class="metric-usd">$${group.totalUsd.toFixed(2)}</span>
+                        <span class="metric-value">${formatToken(group.totalAmount, 6)} ${symbol}</span>
+                        <span class="metric-usd">$${formatCurrency(group.totalUsd)}</span>
                     </div>
                 </td>
                 <td>
-                    <span class="apr-value">${avgApy.toFixed(2)}%</span>
+                    <span class="apr-value">${formatNumber(avgApy, 2)}%</span>
                 </td>
                 <td class="profit-cell" data-symbol="${symbol}">
                     <div class="profit-positive">
-                        <span class="profit-value">+${totalProfit.toFixed(8)}</span><span class="profit-symbol"> ${symbol}</span>
-                        <div class="balance-usd">+$<span class="profit-usd-value">${totalProfitUsd.toFixed(4)}</span></div>
+                        <span class="profit-value">+${formatToken(totalProfit, 8)}</span><span class="profit-symbol"> ${symbol}</span>
+                        <div class="balance-usd">+$<span class="profit-usd-value">${formatNumber(totalProfitUsd, 4)}</span></div>
                     </div>
                 </td>
                 <td>
@@ -1931,6 +2162,11 @@ class UI {
             
             tbody.appendChild(row);
         });
+        
+        // If all groups were filtered out (zero balance), show empty message
+        if (tbody.children.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #6b7280;">No deposits yet</td></tr>';
+        }
     }
 
     renderYourBorrowsTable() {
@@ -2043,17 +2279,17 @@ class UI {
                 <td>${networksHtml}</td>
                 <td>
                     <div class="metric-cell">
-                        <span class="metric-value">${group.totalAmount.toFixed(6)} ${symbol}</span>
-                        <span class="metric-usd">$${(group.totalAmount * firstAsset.price).toFixed(2)}</span>
+                        <span class="metric-value">${formatToken(group.totalAmount, 6)} ${symbol}</span>
+                        <span class="metric-usd">$${formatCurrency(group.totalAmount * firstAsset.price)}</span>
                     </div>
                 </td>
                 <td>
-                    <span class="apr-value">${avgApy.toFixed(2)}%</span>
+                    <span class="apr-value">${formatNumber(avgApy, 2)}%</span>
                 </td>
                 <td class="debt-cell" data-symbol="${symbol}">
                     <div class="profit-negative">
-                        <span class="debt-value">${group.totalDebt.toFixed(8)}</span><span class="debt-symbol"> ${symbol}</span>
-                        <div class="balance-usd">$<span class="debt-usd-value">${totalDebtUsd.toFixed(4)}</span></div>
+                        <span class="debt-value">${formatToken(group.totalDebt, 8)}</span><span class="debt-symbol"> ${symbol}</span>
+                        <div class="balance-usd">$<span class="debt-usd-value">${formatNumber(totalDebtUsd, 4)}</span></div>
                     </div>
                 </td>
                 <td>
@@ -2080,6 +2316,9 @@ class UI {
         tbody.innerHTML = '';
 
         let assets = [...MOCK_ASSETS];
+        
+        // Filter out non-pool assets (depositApr = 0 and borrowApr = 0)
+        assets = assets.filter(a => a.depositApr > 0 || a.borrowApr > 0);
 
         // Filter by asset type
         if (this.selectedAssetTypeBorrow && this.selectedAssetTypeBorrow !== 'all') {
@@ -2198,7 +2437,7 @@ class UI {
                     </div>
                 </td>
                 <td>
-                    <span class="apr-value">${groupedAsset.avgDepositApr < 0.01 ? '<0.01' : groupedAsset.avgDepositApr.toFixed(2)}%</span>
+                    <span class="apr-value">${groupedAsset.avgDepositApr < 0.01 ? '<0.01' : formatNumber(groupedAsset.avgDepositApr, 2)}%</span>
                 </td>
                 <td>
                     <div class="metric-cell">
@@ -2207,7 +2446,7 @@ class UI {
                     </div>
                 </td>
                 <td>
-                    <span class="apr-value">${groupedAsset.avgBorrowApr < 0.01 ? '<0.01' : groupedAsset.avgBorrowApr.toFixed(2)}%</span>
+                    <span class="apr-value">${groupedAsset.avgBorrowApr < 0.01 ? '<0.01' : formatNumber(groupedAsset.avgBorrowApr, 2)}%</span>
                 </td>
                 <td>
                     <button class="btn btn-primary" onclick="ui.openBorrowModal('${groupedAsset.id}')">Borrow</button>
@@ -2342,15 +2581,16 @@ class UI {
         // Calculate current borrows
         const currentBorrow = appState.getTotalBorrowValue();
         
-        // Available to borrow = (collateral / 1.5) - current borrows
-        const maxBorrow = Math.max(0, totalSelectedCollateral / 1.5 - currentBorrow);
+        // Available to borrow = collateral (with LTV) - current borrows
+        // totalSelectedCollateral already includes LTV, so no need to divide
+        const maxBorrow = Math.max(0, totalSelectedCollateral - currentBorrow);
         const maxBorrowInAsset = maxBorrow / asset.price;
 
         document.getElementById('borrowMaxAmount').textContent = 
-            `Max available: ${maxBorrowInAsset.toFixed(6)} ${asset.symbol} ($${maxBorrow.toFixed(2)})`;
+            `Max available: ${formatToken(maxBorrowInAsset, 6)} ${asset.symbol} ($${formatCurrency(maxBorrow)})`;
 
         // Update health factor preview
-        const borrowAmount = parseFloat(document.getElementById('borrowAmountInput').value) || 0;
+        const borrowAmount = parseNumber(document.getElementById('borrowAmountInput').value);
         const borrowValue = borrowAmount * asset.price;
         const newTotalBorrow = currentBorrow + borrowValue;
 
@@ -2358,14 +2598,16 @@ class UI {
         let healthClass = '';
         let warningText = '';
 
-        if (newTotalBorrow > 0 && totalSelectedCollateral > 0) {
+        // Only calculate health factor if debt is meaningful (>= $0.01)
+        if (newTotalBorrow >= 0.01 && totalSelectedCollateral > 0) {
             const hf = totalSelectedCollateral / newTotalBorrow;
             healthFactor = hf.toFixed(2);
 
-            if (hf < 1.2) {
+            // Since totalSelectedCollateral has LTV, hf should be >= 1.0 for safe borrowing
+            if (hf < 1.0) {
                 healthClass = 'danger';
                 warningText = '⚠ High risk of liquidation!';
-            } else if (hf < 2) {
+            } else if (hf < 1.2) {
                 healthClass = 'warning';
                 warningText = 'Moderate risk - consider borrowing less';
             } else {
@@ -2412,7 +2654,7 @@ class UI {
         // Set asset info
         document.getElementById('repayAssetName').value = `${symbol} - ${asset.name}`;
         const debtField = document.getElementById('repayTotalDebt');
-        debtField.value = `${totalDebt.toFixed(8)} ${symbol} ($${(totalDebt * asset.price).toFixed(2)})`;
+        debtField.value = `${formatToken(totalDebt, 8)} ${symbol} ($${formatCurrency(totalDebt * asset.price)})`;
         debtField.dataset.debtAmount = totalDebt;
 
         // Populate assets to pay with
@@ -2492,7 +2734,7 @@ class UI {
         }
 
         document.getElementById('repayAssetBalance').textContent = 
-            `Available: ${availableBalance.toFixed(8)} ${selectedAsset.symbol}`;
+            `Available: ${formatToken(availableBalance, 8)} ${selectedAsset.symbol}`;
     }
 
     executeRepay(fullRepay) {
@@ -2530,7 +2772,7 @@ class UI {
             }
         } else {
             // Partial repay: input contains amount in repay asset
-            amountInRepayAsset = parseFloat(document.getElementById('repayAmountInput').value);
+            amountInRepayAsset = parseNumber(document.getElementById('repayAmountInput').value);
             if (!amountInRepayAsset || amountInRepayAsset <= 0) {
                 alert('Please enter a valid amount');
                 return;
@@ -2609,10 +2851,23 @@ class UI {
 
     toggleCollateralForGroup(symbol, enabled) {
         // Toggle collateral for all assets in this group
-        const assetsInGroup = MOCK_ASSETS.filter(a => a.symbol === symbol);
+        const assetsInGroup = MOCK_ASSETS.filter(a => a.symbol === symbol && a.depositApr > 0);
+        
         assetsInGroup.forEach(asset => {
             const deposit = appState.poolDeposits[asset.id];
-            if (deposit && deposit.amount > 0) {
+            const walletBalance = appState.walletBalances[asset.id] || 0;
+            
+            // If asset exists in poolDeposits or wallet
+            if ((deposit && deposit.amount > 0) || walletBalance > 0) {
+                // If asset only in wallet, create poolDeposit entry
+                if (!deposit && walletBalance > 0) {
+                    appState.poolDeposits[asset.id] = {
+                        amount: 0, // Keep in wallet for now
+                        initialTime: Date.now()
+                    };
+                }
+                
+                // Toggle collateral
                 if (enabled) {
                     appState.collateralEnabled[asset.id] = true;
                 } else {
@@ -2620,8 +2875,9 @@ class UI {
                 }
             }
         });
+        
         appState.saveState();
-        this.renderStatsCards();
+        this.render();
     }
 
     updateProfitCells() {
@@ -2806,11 +3062,11 @@ class UI {
                     </div>
                     <div class="wallet-asset-info">
                         <span class="wallet-asset-name">${symbol}</span>
-                        <span class="wallet-asset-balance">${data.amount.toFixed(6)} ${symbol}</span>
+                        <span class="wallet-asset-balance">${formatToken(data.amount, 6)} ${symbol}</span>
                     </div>
                     <div class="wallet-asset-value">
-                        <span class="wallet-asset-usd">$${data.usd.toFixed(2)}</span>
-                        <span class="wallet-asset-change ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
+                        <span class="wallet-asset-usd">$${formatCurrency(data.usd)}</span>
+                        <span class="wallet-asset-change ${changeClass}">${changeSign}${formatNumber(change, 2)}%</span>
                     </div>
                 `;
                 assetsList.appendChild(assetItem);
@@ -2832,21 +3088,24 @@ class UI {
 
         const modal = document.getElementById('depositModal');
         
-        // Group pools by symbol (show each symbol only once)
+        // Group pools by symbol (show only pool assets with depositApr > 0)
         const poolGroups = new Map();
         MOCK_ASSETS.forEach(asset => {
-            if (!poolGroups.has(asset.symbol)) {
-                poolGroups.set(asset.symbol, {
-                    symbol: asset.symbol,
-                    name: asset.name,
-                    icon: asset.icon,
-                    networks: []
+            // Only show pool assets, not regular stablecoins
+            if (asset.depositApr > 0) {
+                if (!poolGroups.has(asset.symbol)) {
+                    poolGroups.set(asset.symbol, {
+                        symbol: asset.symbol,
+                        name: asset.name,
+                        icon: asset.icon,
+                        networks: []
+                    });
+                }
+                poolGroups.get(asset.symbol).networks.push({
+                    network: asset.network,
+                    id: asset.id
                 });
             }
-            poolGroups.get(asset.symbol).networks.push({
-                network: asset.network,
-                id: asset.id
-            });
         });
 
         // Convert to array for dropdown
@@ -3030,7 +3289,7 @@ class UI {
         const balance = appState.walletBalances[this.selectedFromAssetForDeposit] || 0;
 
         document.getElementById('depositFromBalance').textContent = 
-            `Balance: ${balance.toFixed(8)} ${fromAsset ? fromAsset.symbol : ''}`;
+            `Balance: ${formatToken(balance, 8)} ${fromAsset ? fromAsset.symbol : ''}`;
 
         // Update currency label - show FROM ASSET currency, not pool!
         const depositCurrency = document.getElementById('depositCurrency');
@@ -3049,7 +3308,7 @@ class UI {
         
         if (!amountInput || !previewAmount || !previewSymbol) return;
 
-        const amount = parseFloat(amountInput.value) || 0;
+        const amount = parseNumber(amountInput.value);
         
         if (amount > 0 && this.selectedFromAssetForDeposit && this.selectedPoolForDeposit) {
             const fromAsset = MOCK_ASSETS.find(a => a.id === this.selectedFromAssetForDeposit);
@@ -3077,13 +3336,36 @@ class UI {
 
         this.selectedPoolForWithdraw = poolId;
         const pool = MOCK_ASSETS.find(a => a.id === poolId);
-        const deposit = appState.poolDeposits[poolId];
+        
+        if (!pool) return;
+        
+        // Get total available balance (deposits + wallet)
+        const depositAmount = appState.poolDeposits[poolId]?.amount || 0;
+        const walletAmount = appState.walletBalances[poolId] || 0;
+        const totalAvailable = depositAmount + walletAmount;
+        
+        if (totalAvailable <= 0) {
+            alert('No balance to withdraw');
+            return;
+        }
 
-        if (!pool || !deposit) return;
-
-        document.getElementById('withdrawPoolName').value = `${pool.name} (${pool.network})`;
+        // Update pool display card
+        const poolIcon = document.getElementById('withdrawPoolIcon');
+        const networkIcon = this.getNetworkIcon(pool.network);
+        if (poolIcon) {
+            poolIcon.innerHTML = `
+                <img src="${pool.icon}" alt="${pool.symbol}">
+                ${networkIcon ? `<img src="${networkIcon}" alt="${pool.network}" class="network-badge-pool">` : ''}
+            `;
+        }
+        
+        document.getElementById('withdrawPoolDisplayName').textContent = pool.symbol;
+        document.getElementById('withdrawPoolDisplayNetwork').textContent = pool.network;
+        document.getElementById('withdrawPoolDisplayBalance').textContent = 
+            `${formatToken(totalAvailable, 8)} ${pool.symbol}`;
+        
         document.getElementById('withdrawBalance').textContent = 
-            `Available: ${deposit.amount.toFixed(8)} ${pool.symbol}`;
+            `Available: ${formatToken(totalAvailable, 8)} ${pool.symbol}`;
         document.getElementById('withdrawAmountInput').value = '';
         document.getElementById('withdrawAmountUsdInput').value = '';
         
@@ -3099,8 +3381,14 @@ class UI {
         const confirmBtn = document.getElementById('confirmWithdrawBtn');
         
         if (isCollateral) {
-            // Find all active borrows
-            const activeBorrows = appState.borrows.filter(b => !b.repaid);
+            // Find all active borrows with meaningful debt (>= $0.01)
+            const activeBorrows = appState.borrows.filter(b => {
+                if (b.repaid) return false;
+                const asset = MOCK_ASSETS.find(a => a.id === b.assetId);
+                if (!asset) return false;
+                const debt = b.amount + b.accumulatedInterest;
+                return (debt * asset.price) >= 0.01; // Only show if debt >= $0.01
+            });
             
             if (activeBorrows.length > 0) {
                 // Show warning
@@ -3109,7 +3397,7 @@ class UI {
                 confirmBtn.style.opacity = '0.5';
                 confirmBtn.style.cursor = 'not-allowed';
                 
-                // Populate loan list
+                // Populate loan list with clickable items
                 const loanList = document.getElementById('withdrawWarningLoanList');
                 loanList.innerHTML = '';
                 
@@ -3118,11 +3406,29 @@ class UI {
                     if (borrowAsset) {
                         const li = document.createElement('li');
                         const debt = borrow.amount + borrow.accumulatedInterest;
-                        li.textContent = `${borrowAsset.symbol}: ${debt.toFixed(6)} ${borrowAsset.symbol} ($${(debt * borrowAsset.price).toFixed(2)})`;
+                        
+                        // Create clickable link
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.style.color = '#3b82f6';
+                        link.style.textDecoration = 'underline';
+                        link.style.cursor = 'pointer';
+                        link.textContent = `${borrowAsset.symbol}: ${debt.toFixed(6)} ${borrowAsset.symbol} ($${(debt * borrowAsset.price).toFixed(2)})`;
+                        
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            // Close withdraw modal
+                            document.getElementById('withdrawModal').classList.remove('active');
+                            // Open repay modal for this asset
+                            this.repayLoan(borrowAsset.symbol);
+                        });
+                        
+                        li.appendChild(link);
                         loanList.appendChild(li);
                     }
                 });
             } else {
+                // No meaningful debt - allow withdrawal
                 warningDiv.style.display = 'none';
                 confirmBtn.disabled = false;
                 confirmBtn.style.opacity = '1';
@@ -3135,31 +3441,113 @@ class UI {
             confirmBtn.style.cursor = 'pointer';
         }
         
-        // Populate withdraw to assets dropdown
+        // Populate withdraw to assets dropdown (by symbol)
+        const withdrawToSymbols = new Set();
         const withdrawToItems = [];
         
-        // Add all available assets (stablecoins and other assets)
         MOCK_ASSETS.forEach(asset => {
-            // Show all assets except the pool asset itself
-            if (asset.id !== poolId) {
+            if (!withdrawToSymbols.has(asset.symbol)) {
+                withdrawToSymbols.add(asset.symbol);
                 withdrawToItems.push({
-                    id: asset.id,
+                    id: asset.symbol,
                     symbol: asset.symbol,
-                    name: asset.name,
+                    name: asset.symbol,
                     icon: asset.icon,
                     disabled: false
                 });
             }
         });
         
-        // Set default to first stablecoin or first asset
-        const defaultAsset = withdrawToItems.find(a => a.symbol === 'USDC' || a.symbol === 'USDS') || withdrawToItems[0];
-        this.selectedWithdrawToAsset = defaultAsset ? defaultAsset.id : null;
+        // Set default to USDC on Base
+        const defaultToAsset = withdrawToItems.find(a => a.symbol === 'USDC') || withdrawToItems[0];
+        this.selectedWithdrawToSymbol = defaultToAsset ? defaultToAsset.symbol : null;
+        this.selectedWithdrawToNetwork = 'Base'; // Default to Base network for USDC
+        this.selectedWithdrawToAsset = 'usdc-base'; // Will be verified in updateActualWithdrawToAssetSelection
         
-        this.populateCustomDropdown('withdrawToAsset', withdrawToItems, this.selectedWithdrawToAsset);
+        // Populate asset dropdown first
+        this.populateCustomDropdown('withdrawToAsset', withdrawToItems, this.selectedWithdrawToSymbol);
+        
+        // Then update network selector (this will show available networks)
+        this.updateWithdrawToNetworkSelector();
+        
+        // Then verify/update actual asset ID based on symbol + network
+        this.updateActualWithdrawToAssetSelection();
+        
+        // Finally update preview
         this.updateWithdrawPreview();
 
         document.getElementById('withdrawModal').classList.add('active');
+    }
+    
+    updateWithdrawToNetworkSelector() {
+        const symbol = this.selectedWithdrawToSymbol;
+        if (!symbol) {
+            document.getElementById('withdrawToNetworkSelector').style.display = 'none';
+            return;
+        }
+        
+        // Find all networks for this symbol
+        const networksForSymbol = MOCK_ASSETS
+            .filter(a => a.symbol === symbol)
+            .map(a => ({ network: a.network, icon: this.getNetworkIcon(a.network) }));
+        
+        // Always show network selector
+        document.getElementById('withdrawToNetworkSelector').style.display = 'block';
+        
+        const networkItems = networksForSymbol.map(n => ({
+            id: n.network,
+            symbol: n.network,
+            name: n.network,
+            icon: n.icon,
+            disabled: networksForSymbol.length === 1 // Disable if only one network
+        }));
+        
+        // Set default to first network if not selected or not valid for this symbol
+        if (!this.selectedWithdrawToNetwork || !networksForSymbol.find(n => n.network === this.selectedWithdrawToNetwork)) {
+            this.selectedWithdrawToNetwork = networkItems[0]?.network || null;
+        }
+        
+        // Populate dropdown with selected network
+        this.populateCustomDropdown('withdrawToNetwork', networkItems, this.selectedWithdrawToNetwork);
+        
+        // Disable trigger if only one network and ensure it shows the selected network
+        const trigger = document.getElementById('withdrawToNetworkTrigger');
+        const networkText = document.getElementById('withdrawToNetworkText');
+        const networkIcon = trigger?.querySelector('.dropdown-icon');
+        
+        if (trigger) {
+            if (networksForSymbol.length === 1) {
+                trigger.style.opacity = '0.6';
+                trigger.style.cursor = 'not-allowed';
+                trigger.disabled = true;
+                
+                // Make sure the selected network is displayed even when disabled
+                if (networkText && networkIcon && this.selectedWithdrawToNetwork) {
+                    const selectedNetworkItem = networkItems[0];
+                    networkText.textContent = selectedNetworkItem.name;
+                    networkIcon.innerHTML = `<img src="${selectedNetworkItem.icon}" alt="${selectedNetworkItem.name}">`;
+                    networkIcon.classList.add('has-icon');
+                }
+            } else {
+                trigger.style.opacity = '1';
+                trigger.style.cursor = 'pointer';
+                trigger.disabled = false;
+            }
+        }
+    }
+    
+    updateActualWithdrawToAssetSelection() {
+        const symbol = this.selectedWithdrawToSymbol;
+        const network = this.selectedWithdrawToNetwork;
+        
+        if (!symbol || !network) {
+            this.selectedWithdrawToAsset = null;
+            return;
+        }
+        
+        // Find actual asset by symbol + network
+        const asset = MOCK_ASSETS.find(a => a.symbol === symbol && a.network === network);
+        this.selectedWithdrawToAsset = asset ? asset.id : null;
     }
     
     updateWithdrawPreview() {
@@ -3170,7 +3558,7 @@ class UI {
         
         if (!amountInput || !previewAmount || !previewSymbol || !previewDiv) return;
 
-        const amount = parseFloat(amountInput.value) || 0;
+        const amount = parseNumber(amountInput.value);
         
         if (amount > 0 && this.selectedPoolForWithdraw && this.selectedWithdrawToAsset) {
             const fromAsset = MOCK_ASSETS.find(a => a.id === this.selectedPoolForWithdraw);
@@ -3371,12 +3759,12 @@ class UI {
         const utilizationRate = (borrowed / totalSupplied * 100).toFixed(2);
 
         // Update pool stats
-        document.getElementById('poolTotalSupplied').textContent = `${totalSupplied.toLocaleString()} ${pool.symbol}`;
-        document.getElementById('poolTotalSuppliedUsd').textContent = `$${totalSuppliedUsd.toLocaleString()}`;
-        document.getElementById('poolDepositApy').textContent = `${pool.depositApr.toFixed(2)}%`;
-        document.getElementById('poolSupplyCap').textContent = `${supplyCap.toLocaleString()} ${pool.symbol}`;
-        document.getElementById('poolSupplyCapUsd').textContent = `$${supplyCapUsd.toLocaleString()}`;
-        document.getElementById('poolAvailableSupply').textContent = `${availableSupply.toLocaleString()} ${pool.symbol}`;
+        document.getElementById('poolTotalSupplied').textContent = `${formatNumber(totalSupplied, 0)} ${pool.symbol}`;
+        document.getElementById('poolTotalSuppliedUsd').textContent = `$${formatCurrency(totalSuppliedUsd)}`;
+        document.getElementById('poolDepositApy').textContent = `${formatNumber(pool.depositApr, 2)}%`;
+        document.getElementById('poolSupplyCap').textContent = `${formatNumber(supplyCap, 0)} ${pool.symbol}`;
+        document.getElementById('poolSupplyCapUsd').textContent = `$${formatCurrency(supplyCapUsd)}`;
+        document.getElementById('poolAvailableSupply').textContent = `${formatNumber(availableSupply, 0)} ${pool.symbol}`;
         document.getElementById('poolAvailableSupplyUsd').textContent = `$${availableSupplyUsd.toLocaleString()}`;
 
         // Update collateral parameters
@@ -3423,16 +3811,16 @@ class UI {
         const availableToBorrow = Math.max(0, totalCollateral / 1.5 - totalBorrow);
         const availableToBorrowInAsset = availableToBorrow / pool.price;
 
-        document.getElementById('poolAvailableBorrow').textContent = `${availableToBorrowInAsset.toFixed(8)} ${pool.symbol}`;
-        document.getElementById('poolAvailableBorrowUsd').textContent = `$${availableToBorrow.toFixed(2)}`;
+        document.getElementById('poolAvailableBorrow').textContent = `${formatToken(availableToBorrowInAsset, 8)} ${pool.symbol}`;
+        document.getElementById('poolAvailableBorrowUsd').textContent = `$${formatCurrency(availableToBorrow)}`;
 
         // User position
         const deposit = appState.poolDeposits[pool.id];
         const depositAmount = deposit ? deposit.amount : 0;
         const depositUsd = depositAmount * pool.price;
 
-        document.getElementById('poolUserDeposited').textContent = `${depositAmount.toFixed(8)} ${pool.symbol}`;
-        document.getElementById('poolUserDepositedUsd').textContent = `$${depositUsd.toFixed(2)}`;
+        document.getElementById('poolUserDeposited').textContent = `${formatToken(depositAmount, 8)} ${pool.symbol}`;
+        document.getElementById('poolUserDepositedUsd').textContent = `$${formatCurrency(depositUsd)}`;
 
         // Calculate profit
         let profit = 0;
@@ -3444,10 +3832,10 @@ class UI {
             profitUsd = profit * pool.price;
         }
 
-        document.getElementById('poolUserProfit').textContent = `+${profit.toFixed(12)} ${pool.symbol}`;
+        document.getElementById('poolUserProfit').textContent = `+${formatToken(profit, 12)} ${pool.symbol}`;
         document.getElementById('poolUserProfit').innerHTML = `
-            +${profit.toFixed(12)} ${pool.symbol}
-            <span class="position-usd">+$${profitUsd.toFixed(8)}</span>
+            +${formatToken(profit, 12)} ${pool.symbol}
+            <span class="position-usd">+$${formatToken(profitUsd, 8)}</span>
         `;
 
         // Collateral toggle
@@ -3464,8 +3852,8 @@ class UI {
             const totalBorrowedUsd = totalBorrowed * pool.price;
 
             document.getElementById('poolBorrowSection').style.display = 'flex';
-            document.getElementById('poolUserBorrowed').textContent = `${totalBorrowed.toFixed(8)} ${pool.symbol}`;
-            document.getElementById('poolUserBorrowedUsd').textContent = `$${totalBorrowedUsd.toFixed(2)}`;
+            document.getElementById('poolUserBorrowed').textContent = `${formatToken(totalBorrowed, 8)} ${pool.symbol}`;
+            document.getElementById('poolUserBorrowedUsd').textContent = `$${formatCurrency(totalBorrowedUsd)}`;
         } else {
             document.getElementById('poolBorrowSection').style.display = 'none';
         }
@@ -3604,7 +3992,7 @@ class UI {
         items.forEach(item => {
             const div = document.createElement('div');
             div.className = 'custom-dropdown-item';
-            if (item.id === selectedId && !item.disabled) {
+            if (item.id === selectedId) {
                 div.classList.add('selected');
                 selectedItem = item;
             }
@@ -3658,11 +4046,18 @@ class UI {
             dropdown.appendChild(div);
         });
         
-        // Set initial trigger display if there's a selected item
+        // Set initial trigger display if there's a selected item (even if disabled)
         if (selectedItem && text && icon) {
             const displayText = (selectedItem.symbol === selectedItem.name) ? selectedItem.name : `${selectedItem.symbol} - ${selectedItem.name}`;
             text.textContent = displayText;
             icon.innerHTML = `<img src="${selectedItem.icon}" alt="${selectedItem.symbol}">`;
+            icon.classList.add('has-icon');
+        } else if (items.length === 1 && text && icon) {
+            // If only one item (disabled), still show it
+            const item = items[0];
+            const displayText = (item.symbol === item.name) ? item.name : `${item.symbol} - ${item.name}`;
+            text.textContent = displayText;
+            icon.innerHTML = `<img src="${item.icon}" alt="${item.symbol}">`;
             icon.classList.add('has-icon');
         }
     }
@@ -3735,11 +4130,11 @@ class UI {
         if (!tokenInput || !usdInput) return;
         
         if (sourceType === 'token') {
-            const tokenValue = parseFloat(tokenInput.value) || 0;
+            const tokenValue = parseNumber(tokenInput.value);
             const usdValue = tokenValue * assetPrice;
             usdInput.value = usdValue > 0 ? usdValue.toFixed(2) : '';
         } else if (sourceType === 'usd') {
-            const usdValue = parseFloat(usdInput.value) || 0;
+            const usdValue = parseNumber(usdInput.value);
             const tokenValue = assetPrice > 0 ? usdValue / assetPrice : 0;
             tokenInput.value = tokenValue > 0 ? tokenValue.toFixed(8) : '';
         }

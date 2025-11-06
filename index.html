@@ -895,20 +895,45 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>From Pool</label>
-                    <input type="text" id="withdrawPoolName" readonly class="input-field">
+                    <div class="pool-display-card">
+                        <div class="pool-display-left">
+                            <div class="pool-display-icon" id="withdrawPoolIcon">
+                                <!-- Icon will be populated by JS -->
+                            </div>
+                            <div class="pool-display-info">
+                                <div class="pool-display-name" id="withdrawPoolDisplayName">Pool Asset</div>
+                                <div class="pool-display-network" id="withdrawPoolDisplayNetwork">Network</div>
+                            </div>
+                        </div>
+                        <div class="pool-display-balance" id="withdrawPoolDisplayBalance">0.00</div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Withdraw To</label>
-                    <div class="custom-dropdown">
-                        <button type="button" class="custom-dropdown-trigger" id="withdrawToAssetTrigger">
-                            <span class="dropdown-selected">
-                                <span class="dropdown-icon"></span>
-                                <span class="dropdown-text" id="withdrawToAssetText">Select Asset</span>
-                            </span>
-                            <span class="arrow">▼</span>
-                        </button>
-                        <div class="custom-dropdown-menu" id="withdrawToAssetDropdown">
-                            <!-- Options will be populated by JS -->
+                    <div style="display: flex; gap: 12px;">
+                        <div class="custom-dropdown" style="flex: 1;">
+                            <button type="button" class="custom-dropdown-trigger" id="withdrawToAssetTrigger">
+                                <span class="dropdown-selected">
+                                    <span class="dropdown-icon"></span>
+                                    <span class="dropdown-text" id="withdrawToAssetText">Select Asset</span>
+                                </span>
+                                <span class="arrow">▼</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="withdrawToAssetDropdown">
+                                <!-- Options will be populated by JS -->
+                            </div>
+                        </div>
+                        <div class="custom-dropdown" id="withdrawToNetworkSelector" style="flex: 1; display: none;">
+                            <button type="button" class="custom-dropdown-trigger" id="withdrawToNetworkTrigger">
+                                <span class="dropdown-selected">
+                                    <span class="dropdown-icon"></span>
+                                    <span class="dropdown-text" id="withdrawToNetworkText">Select Network</span>
+                                </span>
+                                <span class="arrow">▼</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="withdrawToNetworkDropdown">
+                                <!-- Options will be populated by JS -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -930,7 +955,7 @@
                     </div>
                 </div>
                 <div class="withdraw-preview" id="withdrawPreview" style="display: none;">
-                    <span class="preview-text">You will receive</span>
+                    <span class="preview-text">You receive</span>
                     <span class="preview-amount" id="withdrawPreviewAmount">0.00000000</span>
                     <span class="preview-symbol" id="withdrawPreviewSymbol">TOKEN</span>
                 </div>

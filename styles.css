@@ -1323,6 +1323,8 @@ body {
     justify-content: space-between;
     transition: all 0.2s;
     text-align: left;
+    min-height: 52px;
+    box-sizing: border-box;
 }
 
 .custom-dropdown-trigger:hover {
@@ -2648,5 +2650,75 @@ body {
         width: 100%;
         max-width: 400px;
     }
+}
+
+/* Pool Display Card (for From Pool in Withdraw) */
+.pool-display-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.pool-display-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pool-display-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: visible;
+}
+
+.pool-display-icon img:first-child {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+.pool-display-icon .network-badge-pool {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.pool-display-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pool-display-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.pool-display-network {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.pool-display-balance {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
 }
 
