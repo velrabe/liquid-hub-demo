@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquidity Hub - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <h1 class="logo">Liquidity Hub</h1>
+            <nav class="header-nav">
+                <button class="nav-link active" data-page="dashboard">Deposits</button>
+                <button class="nav-link" data-page="borrow">Borrow</button>
+                <button class="nav-link" data-page="history">History</button>
+                <button class="nav-link" data-page="settings">Settings</button>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div id="walletButton" class="wallet-button">
+                <span id="walletAddress">Connect Wallet</span>
+            </div>
+        </div>
+    </header>
+
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="page active">
+            <!-- Stats Cards -->
+            <div class="stats-section">
+                <div class="stats-card-group">
+                    <div class="stats-card">
+                        <div class="stats-label">Your deposits</div>
+                        <div class="stats-value" id="userDepositsValue">$0.00</div>
+                        <div class="stats-detail" id="userDepositsDetail">0 assets</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Your profit</div>
+                        <div class="stats-value profit-value" id="userProfitValue">+$0.00</div>
+                        <div class="stats-detail" id="userProfitDetail">+0.00%</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Your health factor</div>
+                        <div class="stats-value health-value" id="healthFactorValue">∞</div>
+                        <div class="stats-detail" id="healthFactorDetail">Total borrowed: $0.00</div>
+                    </div>
+                </div>
+                
+                <div class="stats-card-group">
+                    <div class="stats-card">
+                        <div class="stats-label">Total market size</div>
+                        <div class="stats-value" id="totalMarketSize">$14.27M</div>
+                        <div class="stats-detail">13 assets</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Total value locked</div>
+                        <div class="stats-value" id="totalValueLocked">$10.83M</div>
+                        <div class="stats-detail">Protocol TVL</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Total borrowed</div>
+                        <div class="stats-value" id="totalBorrowed">$4.19M</div>
+                        <div class="stats-detail">Utilization: 38.7%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Your Deposits Table -->
+            <div class="section-header">
+                <h3>Your Deposits</h3>
+            </div>
+            <div class="assets-table your-deposits-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Networks</th>
+                            <th>Amount</th>
+                            <th>APY</th>
+                            <th>Profit</th>
+                            <th>Collateralize</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="yourDepositsTableBody">
+                        <!-- Your deposits will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Available to Deposit Section -->
+            <div class="section-header">
+                <h3>Available to Deposit</h3>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Search">
+                </div>
+
+                <div class="segmented-control">
+                    <button class="segment-btn asset-type-btn active" data-asset-type="all">All</button>
+                    <button class="segment-btn asset-type-btn" data-asset-type="native">Native</button>
+                    <button class="segment-btn asset-type-btn" data-asset-type="stable">Stable</button>
+                    <button class="segment-btn asset-type-btn" data-asset-type="rwa">RWA</button>
+                </div>
+
+                <div class="filter-group network-filter-group">
+                    <button class="filter-btn" id="networksFilter">
+                        <span id="networksFilterText">Networks</span>
+                        <div class="selected-networks" id="selectedNetworksDisplay"></div>
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="network-dropdown" id="networkDropdown">
+                        <div class="network-all-item" id="networkAllItem">
+                            <span>All Networks</span>
+                        </div>
+                        <div class="network-dropdown-divider"></div>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="Ethereum Network" data-icon="crypto/networks/eth.svg">
+                            <img src="crypto/networks/eth.svg" alt="Ethereum">
+                            <span>Ethereum</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="Arbitrum" data-icon="crypto/networks/arbitrum.svg">
+                            <img src="crypto/networks/arbitrum.svg" alt="Arbitrum">
+                            <span>Arbitrum</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="Avalanche" data-icon="crypto/networks/avalanche.svg">
+                            <img src="crypto/networks/avalanche.svg" alt="Avalanche">
+                            <span>Avalanche</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="Base" data-icon="crypto/networks/base.svg">
+                            <img src="crypto/networks/base.svg" alt="Base">
+                            <span>Base</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="BNB Chain" data-icon="crypto/assets/bnb.svg">
+                            <img src="crypto/assets/bnb.svg" alt="BNB Chain">
+                            <span>BNB Chain</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox" data-network="Gnosis" data-icon="crypto/networks/gno.svg">
+                            <img src="crypto/networks/gno.svg" alt="Gnosis">
+                            <span>Gnosis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-reset" id="resetFiltersBtn" style="display: none;">
+                    Reset Filters
+                </button>
+            </div>
+
+            <!-- Available to Deposit Table -->
+            <div class="assets-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">
+                                Asset
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th>Networks</th>
+                            <th class="sortable" data-sort="supplied">
+                                Total supplied
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="depositApy">
+                                Deposit APY
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="borrowed">
+                                Total borrowed
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="borrowApy">
+                                Borrow APY
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="availableToDepositTableBody">
+                        <!-- Assets will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Borrow Page -->
+        <div id="borrowPage" class="page">
+            <!-- Stats Cards for Borrow Page -->
+            <div class="stats-section">
+                <div class="stats-card-group">
+                    <div class="stats-card">
+                        <div class="stats-label">Your borrows</div>
+                        <div class="stats-value" id="userBorrowsValue">$0.00</div>
+                        <div class="stats-detail" id="userBorrowsDetail">0 assets</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Your debt</div>
+                        <div class="stats-value" id="userDebtValue">$0.00</div>
+                        <div class="stats-detail" id="userDebtDetail">Interest rate: 0.00%</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Your health factor</div>
+                        <div class="stats-value health-value" id="borrowHealthFactorValue">∞</div>
+                        <div class="stats-detail" id="borrowHealthFactorDetail">Total collateral: $0.00</div>
+                    </div>
+                </div>
+                
+                <div class="stats-card-group">
+                    <div class="stats-card">
+                        <div class="stats-label">Total market size</div>
+                        <div class="stats-value" id="borrowTotalMarketSize">$14.27M</div>
+                        <div class="stats-detail">13 assets</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Total value locked</div>
+                        <div class="stats-value" id="borrowTotalValueLocked">$10.83M</div>
+                        <div class="stats-detail">Protocol TVL</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="stats-label">Total borrowed</div>
+                        <div class="stats-value" id="borrowTotalBorrowed">$4.19M</div>
+                        <div class="stats-detail">Utilization: 38.7%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Your Borrows Table -->
+            <div class="section-header">
+                <h3>Your Borrows</h3>
+            </div>
+            <div class="assets-table your-borrows-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Networks</th>
+                            <th>Borrowed Amount</th>
+                            <th>APY</th>
+                            <th>Debt</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="yourBorrowsTableBody">
+                        <!-- Your borrows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Available to Borrow Section -->
+            <div class="section-header">
+                <h3>Available to Borrow</h3>
+            </div>
+
+            <!-- Filters for Borrow -->
+            <div class="filters">
+                <div class="search-box">
+                    <input type="text" id="searchInputBorrow" placeholder="Search">
+                </div>
+
+                <div class="segmented-control">
+                    <button class="segment-btn asset-type-btn-borrow active" data-asset-type="all">All</button>
+                    <button class="segment-btn asset-type-btn-borrow" data-asset-type="native">Native</button>
+                    <button class="segment-btn asset-type-btn-borrow" data-asset-type="stable">Stable</button>
+                    <button class="segment-btn asset-type-btn-borrow" data-asset-type="rwa">RWA</button>
+                </div>
+
+                <div class="filter-group network-filter-group">
+                    <button class="filter-btn" id="networksFilterBorrow">
+                        <span id="networksFilterTextBorrow">Networks</span>
+                        <div class="selected-networks" id="selectedNetworksDisplayBorrow"></div>
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="network-dropdown" id="networkDropdownBorrow">
+                        <div class="network-all-item" id="networkAllItemBorrow">
+                            <span>All Networks</span>
+                        </div>
+                        <div class="network-dropdown-divider"></div>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="Ethereum Network" data-icon="crypto/networks/eth.svg">
+                            <img src="crypto/networks/eth.svg" alt="Ethereum">
+                            <span>Ethereum</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="Arbitrum" data-icon="crypto/networks/arbitrum.svg">
+                            <img src="crypto/networks/arbitrum.svg" alt="Arbitrum">
+                            <span>Arbitrum</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="Avalanche" data-icon="crypto/networks/avalanche.svg">
+                            <img src="crypto/networks/avalanche.svg" alt="Avalanche">
+                            <span>Avalanche</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="Base" data-icon="crypto/networks/base.svg">
+                            <img src="crypto/networks/base.svg" alt="Base">
+                            <span>Base</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="BNB Chain" data-icon="crypto/assets/bnb.svg">
+                            <img src="crypto/assets/bnb.svg" alt="BNB Chain">
+                            <span>BNB Chain</span>
+                        </label>
+                        <label class="network-checkbox-item">
+                            <input type="checkbox" class="network-checkbox-borrow" data-network="Gnosis" data-icon="crypto/networks/gno.svg">
+                            <img src="crypto/networks/gno.svg" alt="Gnosis">
+                            <span>Gnosis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-reset" id="resetFiltersBtnBorrow" style="display: none;">
+                    Reset Filters
+                </button>
+            </div>
+
+            <!-- Available to Borrow Table -->
+            <div class="assets-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="name">
+                                Asset
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th>Networks</th>
+                            <th class="sortable" data-sort="supplied">
+                                Total supplied
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="depositApy">
+                                Deposit APY
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="borrowed">
+                                Total borrowed
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th class="sortable" data-sort="borrowApy">
+                                Borrow APY
+                                <span class="sort-icon">▲</span>
+                            </th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="availableToBorrowTableBody">
+                        <!-- Available assets will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="borrow-container" style="display: none;">
+                <div class="borrow-card">
+                    <div class="card-header">
+                        <h3>Deposit</h3>
+                        <button class="link-btn" id="addMoreDeposit">Add more +</button>
+                    </div>
+                    <div class="input-container">
+                        <div class="input-field">
+                            <div class="asset-selector" id="depositAssetSelector">
+                                <span class="asset-icon">💎</span>
+                                <span class="asset-name">ETH</span>
+                                <span class="arrow">▼</span>
+                            </div>
+                            <div class="amount-input">
+                                <input type="number" id="depositAmount" placeholder="0" value="0">
+                                <span class="usd-value" id="depositUsdValue">$0.00</span>
+                            </div>
+                            <div class="max-section">
+                                <button class="max-btn" id="depositMaxBtn">MAX</button>
+                                <span class="available" id="depositAvailable">0 ETH</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-text" id="depositedStatus">
+                        <span>Already deposited ~$0.00</span>
+                    </div>
+                </div>
+
+                <div class="connector-icon">✨</div>
+
+                <div class="borrow-card">
+                    <div class="card-header">
+                        <h3>Borrow</h3>
+                    </div>
+                    <div class="input-container">
+                        <div class="input-field">
+                            <div class="asset-selector" id="borrowAssetSelector">
+                                <span class="asset-icon">💵</span>
+                                <span class="asset-name">USDS</span>
+                                <span class="arrow">▼</span>
+                            </div>
+                            <div class="amount-input">
+                                <input type="number" id="borrowAmount" placeholder="0" value="0">
+                                <span class="usd-value" id="borrowUsdValue">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="borrow-info" id="borrowInfo">
+                        <p>Available to borrow: <span id="availableToBorrow">$0.00</span></p>
+                        <p>Collateral locked: <span id="collateralLocked">$0.00</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <button class="btn btn-primary btn-large" id="executeBorrowBtn">Confirm Borrow</button>
+            </div>
+
+            <!-- Active Borrows -->
+            <div class="active-borrows">
+                <h3>Your Active Borrows</h3>
+                <div id="activeBorrowsList" class="borrows-list">
+                    <!-- Borrows will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <div id="historyPage" class="page">
+            <div class="page-header">
+                <h2>Transaction History</h2>
+            </div>
+            <div class="history-list" id="historyList">
+                <!-- History will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settingsPage" class="page">
+            <div class="page-header">
+                <h2>Settings</h2>
+            </div>
+            <div class="settings-content">
+                <div class="setting-item">
+                    <h3>Reset Demo</h3>
+                    <p>Clear all data and reset to initial state</p>
+                    <button class="btn btn-danger" id="resetBtn">Reset All Data</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pool Detail Page -->
+        <div id="poolPage" class="page">
+            <div class="page-header">
+                <button class="btn btn-secondary" id="backToPoolsBtn">← Back to Dashboard</button>
+                <h2 id="poolPageTitle">Pool Details</h2>
+            </div>
+
+            <div class="pool-detail-container">
+                <!-- Left Column -->
+                <div class="pool-left-column">
+                    <!-- Can be supplied -->
+                    <div class="pool-card">
+                        <div class="pool-card-header">
+                            <h3>✓ Can be supplied</h3>
+                        </div>
+                        <div class="pool-card-body">
+                            <div class="pool-stat">
+                                <label>Total supplied</label>
+                                <div class="pool-stat-value">
+                                    <span id="poolTotalSupplied">0</span>
+                                    <span class="pool-stat-usd" id="poolTotalSuppliedUsd">$0</span>
+                                </div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Deposit APY</label>
+                                <div class="pool-stat-value" id="poolDepositApy">0%</div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Supply cap</label>
+                                <div class="pool-stat-value">
+                                    <span id="poolSupplyCap">0</span>
+                                    <span class="pool-stat-usd" id="poolSupplyCapUsd">$0</span>
+                                </div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Instantly available to supply</label>
+                                <div class="pool-stat-value">
+                                    <span id="poolAvailableSupply">0</span>
+                                    <span class="pool-stat-usd" id="poolAvailableSupplyUsd">$0</span>
+                                </div>
+                            </div>
+                            <div class="pool-chart">
+                                <canvas id="poolSupplyChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Can be used as collateral -->
+                    <div class="pool-card">
+                        <div class="pool-card-header">
+                            <h3>✓ Can be used as collateral</h3>
+                        </div>
+                        <div class="pool-card-body pool-grid">
+                            <div class="pool-stat">
+                                <label>Max LTV</label>
+                                <div class="pool-stat-value" id="poolMaxLtv">0%</div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Liquidation threshold</label>
+                                <div class="pool-stat-value" id="poolLiqThreshold">0%</div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Liquidation penalty</label>
+                                <div class="pool-stat-value" id="poolLiqPenalty">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- E-Mode -->
+                    <div class="pool-card">
+                        <div class="pool-card-header">
+                            <h3>✓ Can be used in E-Mode</h3>
+                        </div>
+                        <div class="pool-card-body pool-grid">
+                            <div class="pool-stat">
+                                <label>Max LTV</label>
+                                <div class="pool-stat-value pool-stat-up" id="poolEmodeMaxLtv">↑ 0%</div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Liquidation threshold</label>
+                                <div class="pool-stat-value pool-stat-up" id="poolEmodeLiqThreshold">↑ 0%</div>
+                            </div>
+                            <div class="pool-stat">
+                                <label>Liquidation penalty</label>
+                                <div class="pool-stat-value pool-stat-down" id="poolEmodeLiqPenalty">↓ 0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="pool-right-column">
+                    <!-- Market Overview -->
+                    <div class="pool-card pool-card-dark">
+                        <div class="pool-card-header">
+                            <h3>Market Overview</h3>
+                        </div>
+                        <div class="pool-card-body pool-center">
+                            <div class="utilization-chart">
+                                <svg viewBox="0 0 200 200" class="donut-chart">
+                                    <circle cx="100" cy="100" r="80" fill="none" stroke="#e5e7eb" stroke-width="20"></circle>
+                                    <circle id="poolUtilizationCircle" cx="100" cy="100" r="80" fill="none" stroke="#f97316" stroke-width="20" 
+                                            stroke-dasharray="0 502.4" transform="rotate(-90 100 100)"></circle>
+                                </svg>
+                                <div class="donut-center">
+                                    <div class="donut-label">Utilization rate</div>
+                                    <div class="donut-value" id="poolUtilizationRate">0%</div>
+                                    <div class="donut-sublabel" id="poolUtilizationAmount">$0 of $0</div>
+                                </div>
+                            </div>
+                            <div class="utilization-legend">
+                                <div class="legend-item">
+                                    <span class="legend-dot" style="background: #f97316;"></span>
+                                    <span class="legend-text">Borrowed <span id="poolBorrowed">$0</span></span>
+                                </div>
+                                <div class="legend-item">
+                                    <span class="legend-dot" style="background: #14b8a6;"></span>
+                                    <span class="legend-text">Instantly available <span id="poolInstantAvailable">$0</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- My Wallet -->
+                    <div class="pool-card">
+                        <div class="pool-card-header">
+                            <h3>My Wallet</h3>
+                        </div>
+                        <div class="pool-card-body">
+                            <div class="wallet-balance">
+                                <div class="wallet-balance-main">
+                                    <span id="poolWalletBalance">0</span>
+                                </div>
+                            </div>
+                            
+                            <div class="wallet-stat">
+                                <div class="wallet-stat-left">
+                                    <label>Available to deposit</label>
+                                    <div class="wallet-stat-value">
+                                        <span id="poolAvailableDeposit">0</span>
+                                        <span class="wallet-stat-usd" id="poolAvailableDepositUsd">$0</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" id="poolDepositBtn">Deposit</button>
+                            </div>
+
+                            <div class="wallet-stat">
+                                <div class="wallet-stat-left">
+                                    <label>Available to borrow</label>
+                                    <div class="wallet-stat-value">
+                                        <span id="poolAvailableBorrow">0</span>
+                                        <span class="wallet-stat-usd" id="poolAvailableBorrowUsd">$0</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" id="poolBorrowBtn">Borrow</button>
+                            </div>
+
+                            <!-- User Position -->
+                            <div class="user-position">
+                                <h4>Your Position</h4>
+                                <div class="position-stat">
+                                    <label>Deposited</label>
+                                    <div class="position-value">
+                                        <span id="poolUserDeposited">0</span>
+                                        <span class="position-usd" id="poolUserDepositedUsd">$0</span>
+                                    </div>
+                                </div>
+                                <div class="position-stat">
+                                    <label>Profit Earned</label>
+                                    <div class="position-value position-profit" id="poolUserProfit">
+                                        +0.00000000
+                                    </div>
+                                </div>
+                                <div class="position-stat">
+                                    <label>Used as Collateral</label>
+                                    <div class="position-value">
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="poolCollateralToggle">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="position-stat" id="poolBorrowSection" style="display: none;">
+                                    <label>Borrowed Amount</label>
+                                    <div class="position-value position-borrow">
+                                        <span id="poolUserBorrowed">0</span>
+                                        <span class="position-usd" id="poolUserBorrowedUsd">$0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    
+    <!-- Wallet Connect Modal -->
+    <div id="walletModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Connect Wallet</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Connect your wallet to start using Liquidity Hub</p>
+                <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">(Demo mode - wallet address will be generated automatically)</p>
+                <button class="btn btn-primary btn-large" id="connectWalletBtn">Connect Wallet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Up Modal -->
+    <div id="topUpModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Top Up Balance</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Stablecoin</label>
+                    <select id="topUpAssetSelect" class="select-field">
+                        <option value="USDS">USDS</option>
+                        <option value="USDC">USDC</option>
+                        <option value="DAI">DAI</option>
+                        <option value="USDT">USDT</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="topUpAmount" placeholder="1000" class="input-field">
+                </div>
+                <button class="btn btn-primary btn-large" id="confirmTopUpBtn">Confirm Top Up</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Borrow Modal -->
+    <div id="borrowModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Borrow Asset</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Asset to Borrow</label>
+                    <input type="text" id="borrowAssetName" readonly class="input-field">
+                </div>
+                
+                <div class="form-group">
+                    <label>Select Collateral</label>
+                    <div class="collateral-selector">
+                        <button type="button" class="collateral-trigger" id="collateralTrigger">
+                            <span id="collateralTriggerText">Select collateral assets...</span>
+                            <span class="arrow">▼</span>
+                        </button>
+                        <div class="collateral-dropdown" id="collateralDropdown">
+                            <!-- Collateral options will be populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount to Borrow</label>
+                    <div class="dual-input-container">
+                        <div class="input-segment">
+                            <input type="number" id="borrowAmountInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency" id="borrowCurrency">TOKEN</span>
+                        </div>
+                        <div class="input-segment">
+                            <input type="number" id="borrowAmountUsdInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency">USD</span>
+                        </div>
+                    </div>
+                    <div class="input-actions">
+                        <button class="max-btn" id="borrowMaxBtn">MAX</button>
+                        <small id="borrowMaxAmount" class="balance-text">Max available: 0</small>
+                    </div>
+                </div>
+
+                <div class="health-factor-preview">
+                    <div class="health-factor-label">Health Factor</div>
+                    <div class="health-factor-value" id="borrowHealthPreview">∞</div>
+                    <div class="health-factor-warning" id="borrowHealthWarning"></div>
+                </div>
+
+                <button class="btn btn-primary btn-large" id="confirmBorrowBtn">Confirm Borrow</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Repay Modal -->
+    <div id="repayModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Repay Loan</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Asset</label>
+                    <input type="text" id="repayAssetName" readonly class="input-field">
+                </div>
+
+                <div class="form-group">
+                    <label>Total Debt</label>
+                    <input type="text" id="repayTotalDebt" readonly class="input-field">
+                </div>
+
+                <div class="form-group">
+                    <label>Pay With</label>
+                    <div class="custom-dropdown">
+                        <button type="button" class="custom-dropdown-trigger" id="repayWithAssetTrigger">
+                            <span class="dropdown-selected">
+                                <span class="dropdown-icon"></span>
+                                <span class="dropdown-text" id="repayWithAssetText">Select Asset</span>
+                            </span>
+                            <span class="arrow">▼</span>
+                        </button>
+                        <div class="custom-dropdown-menu" id="repayWithAssetDropdown">
+                            <!-- Options will be populated by JS -->
+                        </div>
+                    </div>
+                    <small id="repayAssetBalance" class="balance-text">Available: 0</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount to Repay</label>
+                    <div class="dual-input-container">
+                        <div class="input-segment">
+                            <input type="number" id="repayAmountInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency" id="repayCurrency">TOKEN</span>
+                        </div>
+                        <div class="input-segment">
+                            <input type="number" id="repayAmountUsdInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency">USD</span>
+                        </div>
+                    </div>
+                    <div class="input-actions">
+                        <button class="max-btn" id="repayMaxBtn">MAX</button>
+                    </div>
+                </div>
+
+                <div class="repay-options">
+                    <button class="btn btn-secondary btn-half" id="repayPartialBtn">Partial Repay</button>
+                    <button class="btn btn-primary btn-half" id="repayFullBtn">Full Repay</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deposit Modal -->
+    <div id="depositModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Deposit Assets</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Pool</label>
+                    <div style="display: flex; gap: 12px;">
+                        <div class="custom-dropdown" style="flex: 1;">
+                            <button type="button" class="custom-dropdown-trigger" id="depositPoolTrigger">
+                                <span class="dropdown-selected">
+                                    <span class="dropdown-icon"></span>
+                                    <span class="dropdown-text" id="depositPoolText">Select Pool</span>
+                                </span>
+                                <span class="arrow">▼</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="depositPoolDropdown">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        <div class="custom-dropdown" id="depositNetworkSelector" style="flex: 1; display: none;">
+                            <button type="button" class="custom-dropdown-trigger" id="depositNetworkTrigger">
+                                <span class="dropdown-selected">
+                                    <span class="dropdown-icon"></span>
+                                    <span class="dropdown-text" id="depositNetworkText">Select Network</span>
+                                </span>
+                                <span class="arrow">▼</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="depositNetworkDropdown">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>From Asset (Your Balance)</label>
+                    <div class="custom-dropdown">
+                        <button type="button" class="custom-dropdown-trigger" id="depositFromAssetTrigger">
+                            <span class="dropdown-selected">
+                                <span class="dropdown-icon"></span>
+                                <span class="dropdown-text" id="depositFromAssetText">Select Asset</span>
+                            </span>
+                            <span class="arrow">▼</span>
+                        </button>
+                        <div class="custom-dropdown-menu" id="depositFromAssetDropdown">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <small id="depositFromBalance" class="balance-text">Balance: 0</small>
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <div class="dual-input-container">
+                        <div class="input-segment">
+                            <input type="number" id="depositAmountInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency" id="depositCurrency">TOKEN</span>
+                        </div>
+                        <div class="input-segment">
+                            <input type="number" id="depositAmountUsdInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency">USD</span>
+                        </div>
+                    </div>
+                    <div class="input-actions">
+                        <button class="max-btn" id="depositMaxBtnModal">MAX</button>
+                    </div>
+                </div>
+                <div class="deposit-preview" id="depositPreview">
+                    <span class="preview-text">You will receive</span>
+                    <span class="preview-amount" id="depositPreviewAmount">0.00000000</span>
+                    <span class="preview-symbol" id="depositPreviewSymbol">TOKEN</span>
+                </div>
+                <button class="btn btn-primary btn-large" id="confirmDepositBtn">Confirm Deposit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Withdraw Modal -->
+    <div id="withdrawModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Withdraw Assets</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Pool</label>
+                    <input type="text" id="withdrawPoolName" readonly class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <div class="dual-input-container">
+                        <div class="input-segment">
+                            <input type="number" id="withdrawAmountInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency" id="withdrawCurrency">TOKEN</span>
+                        </div>
+                        <div class="input-segment">
+                            <input type="number" id="withdrawAmountUsdInput" placeholder="0" class="input-field dual-input">
+                            <span class="input-currency">USD</span>
+                        </div>
+                    </div>
+                    <div class="input-actions">
+                        <button class="max-btn" id="withdrawMaxBtn">MAX</button>
+                        <small id="withdrawBalance" class="balance-text">Available: 0</small>
+                    </div>
+                </div>
+                
+                <!-- Collateral Warning -->
+                <div class="collateral-warning" id="withdrawCollateralWarning" style="display: none;">
+                    <div class="warning-icon">⚠️</div>
+                    <div class="warning-content">
+                        <div class="warning-title">Cannot Withdraw Collateral Asset</div>
+                        <div class="warning-message">
+                            This asset is currently being used as collateral for the following loans:
+                        </div>
+                        <ul class="warning-loan-list" id="withdrawWarningLoanList">
+                            <!-- Populated by JS -->
+                        </ul>
+                        <div class="warning-hint">Please repay these loans first or disable collateral before withdrawing.</div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary btn-large" id="confirmWithdrawBtn">Confirm Withdraw</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Sidebar -->
+    <div class="wallet-sidebar" id="walletSidebar">
+        <div class="wallet-sidebar-overlay" id="walletSidebarOverlay"></div>
+        <div class="wallet-sidebar-content">
+            <div class="wallet-sidebar-header">
+                <div class="wallet-address-section">
+                    <div class="wallet-address-label">Wallet Address</div>
+                    <div class="wallet-address-value" id="sidebarWalletAddress">0x0000...0000</div>
+                </div>
+                <button class="disconnect-btn" id="disconnectBtn">Disconnect</button>
+            </div>
+
+            <div class="wallet-balance-section">
+                <div class="total-balance-label">Total Balance</div>
+                <div class="total-balance-value" id="sidebarTotalBalance">$0.00</div>
+            </div>
+
+            <div class="wallet-assets-section">
+                <div class="wallet-assets-header">
+                    <h3>Assets</h3>
+                </div>
+                <div class="wallet-assets-list" id="sidebarAssetsList">
+                    <!-- Assets will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="wallet-topup-section">
+                <button class="topup-trigger-btn" id="topupTriggerBtn">
+                    Top Up
+                </button>
+                <div class="topup-dropdown" id="topupDropdown">
+                    <div class="topup-asset">
+                        <img src="crypto/assets/usdc.svg" alt="USDC" class="topup-asset-icon">
+                        <span class="topup-asset-name">USDC</span>
+                    </div>
+                    <div class="topup-input-group">
+                        <input type="number" id="topupAmountSidebar" placeholder="Enter amount" class="topup-input">
+                    </div>
+                    <button class="topup-submit-btn" id="topupSubmitBtn">Top Up</button>
+                    <div class="topup-notification" id="topupNotification">
+                        <span class="notification-icon">✓</span>
+                        <span class="notification-text">Top up successful!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js" defer></script>
+</body>
+</html>
+
