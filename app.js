@@ -395,8 +395,12 @@ class AppState {
         this.saveState();
     }
 
-    topUp(assetSymbol, amount) {
-        const asset = MOCK_ASSETS.find(a => a.symbol === assetSymbol && a.network === 'Ethereum Network');
+    topUp(assetIdOrSymbol, amount) {
+        // Try to find by assetId first, then by symbol on Ethereum Network
+        let asset = MOCK_ASSETS.find(a => a.id === assetIdOrSymbol);
+        if (!asset) {
+            asset = MOCK_ASSETS.find(a => a.symbol === assetIdOrSymbol && a.network === 'Ethereum Network');
+        }
         if (asset) {
             this.walletBalances[asset.id] = (this.walletBalances[asset.id] || 0) + parseFloat(amount);
             this.addHistory('top_up', asset.id, amount);
@@ -475,6 +479,50 @@ class AppState {
         this.saveState();
         return true;
     }
+    
+    withdrawAndConvert(poolId, amount, toAssetId) {
+        const pool = MOCK_ASSETS.find(a => a.id === poolId);
+        const toAsset = MOCK_ASSETS.find(a => a.id === toAssetId);
+        if (!pool || !toAsset) return false;
+
+        const deposit = this.poolDeposits[poolId];
+        if (!deposit || deposit.amount < amount) return false;
+
+        // Check if used as collateral and has active borrows
+        if (this.collateralEnabled[poolId]) {
+            const activeBorrows = this.borrows.filter(b => !b.repaid);
+            if (activeBorrows.length > 0) {
+                const totalCollateralValue = this.getTotalCollateralValue();
+                const withdrawValue = amount * pool.price;
+                const remainingCollateral = totalCollateralValue - withdrawValue;
+                const totalBorrowValue = this.getTotalBorrowValue();
+                
+                // Check if remaining collateral is sufficient
+                if (remainingCollateral < totalBorrowValue * 1.2) { // 120% collateralization
+                    alert('Cannot withdraw: insufficient collateral for active borrows');
+                    return false;
+                }
+            }
+        }
+
+        // Deduct from pool
+        deposit.amount -= amount;
+        
+        // Clean up very small deposits
+        if (deposit.amount < 0.00000001) {
+            delete this.poolDeposits[poolId];
+            delete this.collateralEnabled[poolId];
+        }
+
+        // Convert and add to wallet
+        const valueInUsd = amount * pool.price;
+        const convertedAmount = valueInUsd / toAsset.price;
+        this.walletBalances[toAssetId] = (this.walletBalances[toAssetId] || 0) + convertedAmount;
+
+        this.addHistory('withdraw', poolId, amount);
+        this.saveState();
+        return true;
+    }
 
     toggleCollateral(poolId) {
         this.collateralEnabled[poolId] = !this.collateralEnabled[poolId];
@@ -526,8 +574,10 @@ class AppState {
 
         // Calculate total debt (principal + interest)
         const totalDebt = borrow.amount + borrow.accumulatedInterest;
+        
+        const isFullRepayment = amount >= totalDebt;
 
-        if (amount >= totalDebt) {
+        if (isFullRepayment) {
             // Full repayment
             borrow.repaid = true;
             amount = totalDebt;
@@ -541,17 +591,30 @@ class AppState {
             }
         }
 
-        // Deduct from wallet
-        if ((this.walletBalances[borrow.assetId] || 0) < amount) {
-            alert('Insufficient balance to repay');
-            return false;
-        }
-
-        this.walletBalances[borrow.assetId] -= amount;
+        // Note: Balance deduction is handled in executeRepay(), not here
+        // to avoid double deduction
 
         this.addHistory('repay', borrow.assetId, amount);
+        
+        // Auto-disable collateral if loan is fully repaid and no other active loans
+        if (isFullRepayment) {
+            this.checkAndReleaseCollateral();
+        }
+        
         this.saveState();
         return true;
+    }
+    
+    checkAndReleaseCollateral() {
+        // Check if there are any active borrows
+        const hasActiveLoans = this.borrows.some(b => !b.repaid);
+        
+        // If no active loans, automatically disable all collateral
+        if (!hasActiveLoans) {
+            for (const poolId in this.collateralEnabled) {
+                this.collateralEnabled[poolId] = false;
+            }
+        }
     }
 
     getTotalCollateralValue() {
@@ -842,7 +905,7 @@ class UI {
         document.getElementById('topupSubmitBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('topupAmountSidebar').value);
             if (amount && amount > 0) {
-                appState.topUp('USDC', amount);
+                appState.topUp('rusdc-base', amount);
                 document.getElementById('topupAmountSidebar').value = '';
                 
                 // Show notification
@@ -989,12 +1052,19 @@ class UI {
         });
 
         // Withdraw Modal
+        this.initializeCustomDropdown('withdrawToAsset', (assetId) => {
+            this.selectedWithdrawToAsset = assetId;
+            this.updateWithdrawPreview();
+        });
+        
         document.getElementById('withdrawAmountInput').addEventListener('input', () => {
             this.syncDualInput('withdraw', 'token');
+            this.updateWithdrawPreview();
         });
 
         document.getElementById('withdrawAmountUsdInput').addEventListener('input', () => {
             this.syncDualInput('withdraw', 'usd');
+            this.updateWithdrawPreview();
         });
 
         document.getElementById('withdrawMaxBtn').addEventListener('click', () => {
@@ -1003,16 +1073,25 @@ class UI {
                 if (deposit) {
                     document.getElementById('withdrawAmountInput').value = deposit.amount.toFixed(8);
                     this.syncDualInput('withdraw', 'token');
+                    this.updateWithdrawPreview();
                 }
             }
         });
 
         document.getElementById('confirmWithdrawBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('withdrawAmountInput').value);
+            const toAssetId = this.selectedWithdrawToAsset;
+            
+            if (!toAssetId) {
+                alert('Please select an asset to withdraw to');
+                return;
+            }
+            
             if (amount && amount > 0 && this.selectedPoolForWithdraw) {
-                if (appState.withdraw(this.selectedPoolForWithdraw, amount)) {
+                if (appState.withdrawAndConvert(this.selectedPoolForWithdraw, amount, toAssetId)) {
                     document.getElementById('withdrawModal').classList.remove('active');
                     document.getElementById('withdrawAmountInput').value = '';
+                    document.getElementById('withdrawAmountUsdInput').value = '';
                     this.render();
                 } else {
                     alert('Withdrawal failed.');
@@ -1043,8 +1122,36 @@ class UI {
                 const asset = this.selectedBorrowAsset;
                 if (!asset) return;
 
+                // Check if any collateral is selected
+                const selectedCollateralItems = document.querySelectorAll('.collateral-item.selected');
+                
+                if (selectedCollateralItems.length === 0) {
+                    // No collateral selected - highlight the collateral selector
+                    const collateralSelector = document.querySelector('.collateral-selector');
+                    const collateralTrigger = document.getElementById('collateralTrigger');
+                    
+                    if (collateralSelector && collateralTrigger) {
+                        // Add error class
+                        collateralSelector.classList.add('error-highlight');
+                        
+                        // Update trigger text to show hint
+                        const originalText = collateralTrigger.querySelector('#collateralTriggerText').textContent;
+                        collateralTrigger.querySelector('#collateralTriggerText').textContent = 'Please select collateral';
+                        collateralTrigger.querySelector('#collateralTriggerText').style.color = '#ef4444';
+                        
+                        // Remove highlight after 3 seconds
+                        setTimeout(() => {
+                            collateralSelector.classList.remove('error-highlight');
+                            collateralTrigger.querySelector('#collateralTriggerText').textContent = originalText;
+                            collateralTrigger.querySelector('#collateralTriggerText').style.color = '';
+                        }, 3000);
+                    }
+                    
+                    return;
+                }
+
                 let totalSelectedCollateral = 0;
-                document.querySelectorAll('.collateral-item.selected').forEach(item => {
+                selectedCollateralItems.forEach(item => {
                     const poolId = item.dataset.assetId;
                     const deposit = appState.poolDeposits[poolId];
                     const collAsset = MOCK_ASSETS.find(a => a.id === poolId);
@@ -1666,8 +1773,10 @@ class UI {
             return networkIcons[network] || '';
         };
 
-        // Group deposits by symbol
+        // Group deposits by symbol (show deposits + wallet balances for pool assets)
         const depositGroups = new Map();
+        
+        // Add deposits
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
             if (deposit && deposit.amount > 0) {
                 const asset = MOCK_ASSETS.find(a => a.id === poolId);
@@ -1686,6 +1795,39 @@ class UI {
                     group.totalAmount += deposit.amount;
                     group.totalUsd += deposit.amount * asset.price;
                     group.networks.push(asset.network);
+                }
+            }
+        }
+        
+        // Add pool assets from wallet balances (if not already in deposits)
+        for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
+            if (balance > 0.00000001) {
+                const asset = MOCK_ASSETS.find(a => a.id === assetId);
+                if (asset) {
+                    // Check if this asset is already in deposits
+                    const existingDeposit = appState.poolDeposits[assetId];
+                    if (!existingDeposit || existingDeposit.amount < 0.00000001) {
+                        // Only add if it's a pool asset (not a stablecoin)
+                        if (asset.depositApr > 0) {
+                            if (!depositGroups.has(asset.symbol)) {
+                                depositGroups.set(asset.symbol, {
+                                    assets: [],
+                                    totalAmount: 0,
+                                    totalUsd: 0,
+                                    networks: [],
+                                    icon: asset.icon
+                                });
+                            }
+                            const group = depositGroups.get(asset.symbol);
+                            // Create a pseudo-deposit for wallet balance
+                            group.assets.push({ 
+                                asset, 
+                                deposit: { amount: 0, initialTime: Date.now(), isWalletOnly: true }
+                            });
+                            // Don't add to totalAmount since it's in wallet, not deposited
+                            group.networks.push(asset.network);
+                        }
+                    }
                 }
             }
         }
@@ -1822,11 +1964,17 @@ class UI {
             return;
         }
 
-        // Group borrows by symbol
+        // Group borrows by symbol (only show if debt > 0.001)
         const borrowGroups = new Map();
         appState.borrows.filter(b => !b.repaid).forEach(borrow => {
             const asset = MOCK_ASSETS.find(a => a.id === borrow.assetId);
             if (asset) {
+                const debt = borrow.amount + borrow.accumulatedInterest;
+                // Skip if debt is negligible (< $0.01 USD)
+                if (debt * asset.price < 0.01) {
+                    return;
+                }
+                
                 if (!borrowGroups.has(asset.symbol)) {
                     borrowGroups.set(asset.symbol, {
                         assets: [],
@@ -1837,7 +1985,6 @@ class UI {
                     });
                 }
                 const group = borrowGroups.get(asset.symbol);
-                const debt = borrow.amount + borrow.accumulatedInterest;
                 group.assets.push({ asset, borrow, debt });
                 group.totalAmount += borrow.amount;
                 group.totalDebt += debt;
@@ -2153,8 +2300,8 @@ class UI {
         
         // Set currency label
         const borrowCurrency = document.getElementById('borrowCurrency');
-        if (borrowCurrency) {
-            borrowCurrency.textContent = asset.symbol;
+        if (borrowCurrency && asset) {
+            this.updateCurrencyLabel(borrowCurrency, asset);
         }
         
         this.updateBorrowModal();
@@ -2333,15 +2480,15 @@ class UI {
         
         // Update currency label
         const repayCurrency = document.getElementById('repayCurrency');
-        if (repayCurrency) {
-            repayCurrency.textContent = selectedAsset.symbol;
+        if (repayCurrency && selectedAsset) {
+            this.updateCurrencyLabel(repayCurrency, selectedAsset);
         }
 
-        // Get available balance
+        // Get available balance (wallet + deposits)
         let availableBalance = appState.walletBalances[selectedAssetId] || 0;
         const deposit = appState.poolDeposits[selectedAssetId];
         if (deposit && deposit.amount > 0) {
-            availableBalance = Math.max(availableBalance, deposit.amount);
+            availableBalance += deposit.amount;
         }
 
         document.getElementById('repayAssetBalance').textContent = 
@@ -2357,21 +2504,7 @@ class UI {
         if (!repayWithAsset) return;
 
         const totalDebt = parseFloat(document.getElementById('repayTotalDebt').dataset.debtAmount);
-        let amount;
-
-        if (fullRepay) {
-            amount = totalDebt;
-        } else {
-            amount = parseFloat(document.getElementById('repayAmountInput').value);
-            if (!amount || amount <= 0) {
-                alert('Please enter a valid amount');
-                return;
-            }
-            if (amount > totalDebt) {
-                amount = totalDebt;
-            }
-        }
-
+        
         // Find borrow for this symbol
         const borrows = appState.borrows.filter(b => !b.repaid);
         const borrow = borrows.find(b => {
@@ -2381,14 +2514,47 @@ class UI {
 
         if (!borrow) return;
 
-        // Convert amount if paying with different asset
         const borrowAsset = MOCK_ASSETS.find(a => a.id === borrow.assetId);
-        let amountInRepayAsset = amount;
         
-        if (repayWithAsset.id !== borrow.assetId) {
-            // Convert: amount of borrowed asset -> USD -> repay asset
-            const usdValue = amount * borrowAsset.price;
-            amountInRepayAsset = usdValue / repayWithAsset.price;
+        let amount; // Amount in debt asset (borrowed asset)
+        let amountInRepayAsset; // Amount in repay asset
+
+        if (fullRepay) {
+            amount = totalDebt;
+            // Convert to repay asset
+            if (repayWithAsset.id !== borrow.assetId) {
+                const usdValue = amount * borrowAsset.price;
+                amountInRepayAsset = usdValue / repayWithAsset.price;
+            } else {
+                amountInRepayAsset = amount;
+            }
+        } else {
+            // Partial repay: input contains amount in repay asset
+            amountInRepayAsset = parseFloat(document.getElementById('repayAmountInput').value);
+            if (!amountInRepayAsset || amountInRepayAsset <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            // Convert from repay asset to debt asset
+            if (repayWithAsset.id !== borrow.assetId) {
+                const usdValue = amountInRepayAsset * repayWithAsset.price;
+                amount = usdValue / borrowAsset.price;
+            } else {
+                amount = amountInRepayAsset;
+            }
+            
+            // Cap at total debt
+            if (amount > totalDebt) {
+                amount = totalDebt;
+                // Recalculate amountInRepayAsset
+                if (repayWithAsset.id !== borrow.assetId) {
+                    const usdValue = amount * borrowAsset.price;
+                    amountInRepayAsset = usdValue / repayWithAsset.price;
+                } else {
+                    amountInRepayAsset = amount;
+                }
+            }
         }
 
         // Check if we have enough balance
@@ -2406,14 +2572,28 @@ class UI {
         // Deduct from wallet or deposit
         if (appState.walletBalances[repayWithAssetId] >= amountInRepayAsset) {
             appState.walletBalances[repayWithAssetId] -= amountInRepayAsset;
+            // Clean up very small balances
+            if (appState.walletBalances[repayWithAssetId] < 0.00000001) {
+                delete appState.walletBalances[repayWithAssetId];
+            }
         } else {
             const fromWallet = appState.walletBalances[repayWithAssetId] || 0;
             const fromDeposit = amountInRepayAsset - fromWallet;
             appState.walletBalances[repayWithAssetId] = 0;
+            delete appState.walletBalances[repayWithAssetId];
             if (deposit) {
                 deposit.amount -= fromDeposit;
+                // Remove deposit if amount becomes very small or negative
+                if (deposit.amount < 0.00000001) {
+                    delete appState.poolDeposits[repayWithAssetId];
+                    // Also disable collateral for this asset
+                    delete appState.collateralEnabled[repayWithAssetId];
+                }
             }
         }
+        
+        // Save state after balance deduction
+        appState.saveState();
 
         // Repay borrow
         if (appState.repayBorrow(borrow.id, amount)) {
@@ -2565,30 +2745,42 @@ class UI {
         // Get all assets with balance (deposits + wallet)
         const assetsMap = new Map();
 
-        // Add deposits
+        // Network icons mapping
+        const networkIcons = {
+            'Ethereum Network': 'crypto/networks/eth.svg',
+            'Gnosis': 'crypto/networks/gno.svg',
+            'Base': 'crypto/networks/base.svg',
+            'Arbitrum': 'crypto/networks/arbitrum.svg',
+            'BNB Chain': 'crypto/assets/bnb.svg',
+            'Avalanche': 'crypto/networks/avalanche.svg',
+            'Optimism': 'crypto/networks/optimism.svg',
+            'Solana': 'crypto/networks/solana.svg'
+        };
+
+        // Add deposits (group by assetId, not symbol)
         for (const [poolId, deposit] of Object.entries(appState.poolDeposits)) {
             if (deposit && deposit.amount > 0) {
                 const pool = MOCK_ASSETS.find(a => a.id === poolId);
                 if (pool) {
-                    const existing = assetsMap.get(pool.symbol) || { amount: 0, usd: 0 };
+                    const existing = assetsMap.get(pool.id) || { amount: 0, usd: 0 };
                     existing.amount += deposit.amount;
                     existing.usd += deposit.amount * pool.price;
                     existing.asset = pool;
-                    assetsMap.set(pool.symbol, existing);
+                    assetsMap.set(pool.id, existing);
                 }
             }
         }
 
-        // Add wallet balances
+        // Add wallet balances (group by assetId, not symbol)
         for (const [assetId, balance] of Object.entries(appState.walletBalances)) {
             if (balance > 0) {
                 const asset = MOCK_ASSETS.find(a => a.id === assetId);
                 if (asset) {
-                    const existing = assetsMap.get(asset.symbol) || { amount: 0, usd: 0 };
+                    const existing = assetsMap.get(asset.id) || { amount: 0, usd: 0 };
                     existing.amount += balance;
                     existing.usd += balance * asset.price;
                     existing.asset = asset;
-                    assetsMap.set(asset.symbol, existing);
+                    assetsMap.set(asset.id, existing);
                 }
             }
         }
@@ -2597,8 +2789,10 @@ class UI {
         if (assetsMap.size === 0) {
             assetsList.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 20px;">No assets yet</div>';
         } else {
-            assetsMap.forEach((data, symbol) => {
+            assetsMap.forEach((data, assetId) => {
                 const asset = data.asset;
+                const symbol = asset.symbol;
+                const networkIcon = networkIcons[asset.network] || '';
                 const change = Math.random() * 20 - 10; // Mock change percentage
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 const changeSign = change >= 0 ? '+' : '';
@@ -2608,6 +2802,7 @@ class UI {
                 assetItem.innerHTML = `
                     <div class="wallet-asset-icon">
                         <img src="${asset.icon}" alt="${symbol}">
+                        ${networkIcon ? `<img src="${networkIcon}" alt="${asset.network}" class="network-badge">` : ''}
                     </div>
                     <div class="wallet-asset-info">
                         <span class="wallet-asset-name">${symbol}</span>
@@ -2840,7 +3035,7 @@ class UI {
         // Update currency label - show FROM ASSET currency, not pool!
         const depositCurrency = document.getElementById('depositCurrency');
         if (depositCurrency && fromAsset) {
-            depositCurrency.textContent = fromAsset.symbol;
+            this.updateCurrencyLabel(depositCurrency, fromAsset);
         }
 
         // Update deposit preview - show how much pool tokens user will receive
@@ -2894,8 +3089,8 @@ class UI {
         
         // Set currency label
         const withdrawCurrency = document.getElementById('withdrawCurrency');
-        if (withdrawCurrency) {
-            withdrawCurrency.textContent = pool.symbol;
+        if (withdrawCurrency && pool) {
+            this.updateCurrencyLabel(withdrawCurrency, pool);
         }
         
         // Check if asset is being used as collateral for any active loans
@@ -2939,8 +3134,62 @@ class UI {
             confirmBtn.style.opacity = '1';
             confirmBtn.style.cursor = 'pointer';
         }
+        
+        // Populate withdraw to assets dropdown
+        const withdrawToItems = [];
+        
+        // Add all available assets (stablecoins and other assets)
+        MOCK_ASSETS.forEach(asset => {
+            // Show all assets except the pool asset itself
+            if (asset.id !== poolId) {
+                withdrawToItems.push({
+                    id: asset.id,
+                    symbol: asset.symbol,
+                    name: asset.name,
+                    icon: asset.icon,
+                    disabled: false
+                });
+            }
+        });
+        
+        // Set default to first stablecoin or first asset
+        const defaultAsset = withdrawToItems.find(a => a.symbol === 'USDC' || a.symbol === 'USDS') || withdrawToItems[0];
+        this.selectedWithdrawToAsset = defaultAsset ? defaultAsset.id : null;
+        
+        this.populateCustomDropdown('withdrawToAsset', withdrawToItems, this.selectedWithdrawToAsset);
+        this.updateWithdrawPreview();
 
         document.getElementById('withdrawModal').classList.add('active');
+    }
+    
+    updateWithdrawPreview() {
+        const amountInput = document.getElementById('withdrawAmountInput');
+        const previewAmount = document.getElementById('withdrawPreviewAmount');
+        const previewSymbol = document.getElementById('withdrawPreviewSymbol');
+        const previewDiv = document.getElementById('withdrawPreview');
+        
+        if (!amountInput || !previewAmount || !previewSymbol || !previewDiv) return;
+
+        const amount = parseFloat(amountInput.value) || 0;
+        
+        if (amount > 0 && this.selectedPoolForWithdraw && this.selectedWithdrawToAsset) {
+            const fromAsset = MOCK_ASSETS.find(a => a.id === this.selectedPoolForWithdraw);
+            const toAsset = MOCK_ASSETS.find(a => a.id === this.selectedWithdrawToAsset);
+            
+            if (fromAsset && toAsset) {
+                // Calculate how much of target asset user will receive
+                const fromValue = amount * fromAsset.price;
+                const toAmount = fromValue / toAsset.price;
+                
+                previewAmount.textContent = toAmount.toFixed(8);
+                previewSymbol.textContent = toAsset.symbol;
+                previewDiv.style.display = 'flex';
+            } else {
+                previewDiv.style.display = 'none';
+            }
+        } else {
+            previewDiv.style.display = 'none';
+        }
     }
 
     renderBorrowPage() {
@@ -3418,6 +3667,32 @@ class UI {
         }
     }
 
+    getNetworkIcon(network) {
+        const networkIcons = {
+            'Ethereum Network': 'crypto/networks/eth.svg',
+            'Gnosis': 'crypto/networks/gno.svg',
+            'Base': 'crypto/networks/base.svg',
+            'Arbitrum': 'crypto/networks/arbitrum.svg',
+            'BNB Chain': 'crypto/assets/bnb.svg',
+            'Avalanche': 'crypto/networks/avalanche.svg',
+            'Optimism': 'crypto/networks/optimism.svg',
+            'Solana': 'crypto/networks/solana.svg'
+        };
+        return networkIcons[network] || '';
+    }
+
+    updateCurrencyLabel(currencyLabel, asset) {
+        if (!currencyLabel || !asset) return;
+        
+        const networkIcon = this.getNetworkIcon(asset.network);
+        currencyLabel.innerHTML = `
+            <div class="currency-icon">
+                <img src="${asset.icon}" alt="${asset.symbol}">
+                ${networkIcon ? `<img src="${networkIcon}" alt="${asset.network}" class="network-badge-small">` : ''}
+            </div>
+        `;
+    }
+
     syncDualInput(modalType, sourceType) {
         // Get asset price based on modal type
         let assetPrice = 1;
@@ -3429,27 +3704,21 @@ class UI {
             if (asset) assetPrice = asset.price;
             // Update currency label
             const currencyLabel = document.getElementById('depositCurrency');
-            if (currencyLabel && asset) {
-                currencyLabel.textContent = asset.symbol;
-            }
+            this.updateCurrencyLabel(currencyLabel, asset);
         } else if (modalType === 'withdraw') {
             if (this.selectedPoolForWithdraw) {
                 const asset = MOCK_ASSETS.find(a => a.id === this.selectedPoolForWithdraw);
                 if (asset) assetPrice = asset.price;
                 // Update currency label
                 const currencyLabel = document.getElementById('withdrawCurrency');
-                if (currencyLabel && asset) {
-                    currencyLabel.textContent = asset.symbol;
-                }
+                this.updateCurrencyLabel(currencyLabel, asset);
             }
         } else if (modalType === 'borrow') {
             if (this.selectedBorrowAsset) {
                 assetPrice = this.selectedBorrowAsset.price;
                 // Update currency label
                 const currencyLabel = document.getElementById('borrowCurrency');
-                if (currencyLabel) {
-                    currencyLabel.textContent = this.selectedBorrowAsset.symbol;
-                }
+                this.updateCurrencyLabel(currencyLabel, this.selectedBorrowAsset);
             }
         } else if (modalType === 'repay') {
             const repayWithAssetId = this.selectedRepayWithAsset;
@@ -3457,9 +3726,7 @@ class UI {
             if (asset) assetPrice = asset.price;
             // Update currency label
             const currencyLabel = document.getElementById('repayCurrency');
-            if (currencyLabel && asset) {
-                currencyLabel.textContent = asset.symbol;
-            }
+            this.updateCurrencyLabel(currencyLabel, asset);
         }
         
         const tokenInput = document.getElementById(`${modalType}AmountInput`);
