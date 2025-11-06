@@ -2025,17 +2025,14 @@ class UI {
                     // Check if already added from poolDeposits
                     const existingAsset = group.assets.find(a => a.asset.id === assetId);
                     if (existingAsset) {
-                        // Asset already in deposits - add wallet balance to total
-                        group.totalAmount += balance;
-                        group.totalUsd += balance * asset.price;
+                        // Asset already in deposits - mark that it has wallet balance
+                        existingAsset.deposit.walletBalance = balance;
                     } else {
                         // Add new entry for wallet-only balance
                         group.assets.push({ 
                             asset, 
                             deposit: { amount: 0, initialTime: Date.now(), isWalletOnly: true, walletBalance: balance }
                         });
-                        group.totalAmount += balance;
-                        group.totalUsd += balance * asset.price;
                         if (!group.networks.includes(asset.network)) {
                             group.networks.push(asset.network);
                         }
