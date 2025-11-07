@@ -1106,6 +1106,22 @@ class UI {
                 modal.classList.remove('active');
                 // Close any open dropdowns
                 document.querySelectorAll('.collateral-selector').forEach(s => s.classList.remove('active'));
+                
+                // Reset borrow modal dropdowns when closing
+                if (modal && modal.id === 'borrowModal') {
+                    // Reset initialization flags for dropdowns
+                    const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
+                    const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
+                    
+                    if (borrowAssetDropdown) {
+                        borrowAssetDropdown.dataset.initialized = 'false';
+                        borrowAssetDropdown.classList.remove('active');
+                    }
+                    if (borrowNetworkDropdown) {
+                        borrowNetworkDropdown.dataset.initialized = 'false';
+                        borrowNetworkDropdown.classList.remove('active');
+                    }
+                }
             });
         });
 
@@ -1116,6 +1132,21 @@ class UI {
                     modal.classList.remove('active');
                     // Close any open dropdowns
                     document.querySelectorAll('.collateral-selector').forEach(s => s.classList.remove('active'));
+                    
+                    // Reset borrow modal dropdowns when closing
+                    if (modal.id === 'borrowModal') {
+                        const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
+                        const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
+                        
+                        if (borrowAssetDropdown) {
+                            borrowAssetDropdown.dataset.initialized = 'false';
+                            borrowAssetDropdown.classList.remove('active');
+                        }
+                        if (borrowNetworkDropdown) {
+                            borrowNetworkDropdown.dataset.initialized = 'false';
+                            borrowNetworkDropdown.classList.remove('active');
+                        }
+                    }
                 }
             });
         });
@@ -1376,6 +1407,13 @@ class UI {
 
                 if (appState.borrow(asset.id, amount)) {
                     document.getElementById('borrowModal').classList.remove('active');
+                    
+                    // Reset dropdown flags
+                    const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
+                    const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
+                    if (borrowAssetDropdown) borrowAssetDropdown.dataset.initialized = 'false';
+                    if (borrowNetworkDropdown) borrowNetworkDropdown.dataset.initialized = 'false';
+                    
                     this.render();
                 } else {
                     alert('Borrow failed. Please check your collateral.');
@@ -2504,15 +2542,21 @@ class UI {
             return;
         }
         
-        const asset = MOCK_ASSETS.find(a => a.id === assetId);
-        if (!asset) return;
-
-        this.selectedBorrowAsset = asset;
+        // Reset state
         this.selectedCollaterals = [];
-
-        // Set asset name
-        document.getElementById('borrowAssetName').value = `${asset.symbol} - ${asset.name}`;
-
+        this.selectedBorrowAsset = null;
+        this.selectedBorrowSymbol = null;
+        this.selectedBorrowNetwork = null;
+        
+        // If assetId provided, pre-select it
+        let preselectedAsset = null;
+        if (assetId) {
+            preselectedAsset = MOCK_ASSETS.find(a => a.id === assetId);
+        }
+        
+        // Populate Asset dropdown
+        this.populateBorrowAssetDropdown(preselectedAsset);
+        
         // Populate collateral dropdown
         const collateralDropdown = document.getElementById('collateralDropdown');
         collateralDropdown.innerHTML = '';
@@ -2579,17 +2623,103 @@ class UI {
         document.getElementById('borrowAmountInput').value = '';
         document.getElementById('borrowAmountUsdInput').value = '';
         document.getElementById('collateralTriggerText').textContent = 'Select collateral assets...';
-        
-        // Set currency label
-        const borrowCurrency = document.getElementById('borrowCurrency');
-        if (borrowCurrency && asset) {
-            this.updateCurrencyLabel(borrowCurrency, asset);
-        }
-        
-        this.updateBorrowModal();
 
         // Open modal
         document.getElementById('borrowModal').classList.add('active');
+    }
+
+    populateBorrowAssetDropdown(preselectedAsset) {
+        // Group borrow assets by symbol
+        const groupedAssets = new Map();
+        MOCK_ASSETS.forEach(asset => {
+            if (asset.borrowApr > 0) {
+                if (!groupedAssets.has(asset.symbol)) {
+                    groupedAssets.set(asset.symbol, {
+                        symbol: asset.symbol,
+                        name: asset.name,
+                        icon: asset.icon,
+                        networks: []
+                    });
+                }
+                groupedAssets.get(asset.symbol).networks.push(asset);
+            }
+        });
+
+        // Populate asset dropdown
+        const assetDropdown = document.getElementById('borrowAssetDropdown');
+        const assets = Array.from(groupedAssets.values());
+        
+        this.initializeCustomDropdown('borrowAsset', (selectedSymbol) => {
+            this.selectedBorrowSymbol = selectedSymbol;
+            this.updateBorrowNetworkSelector();
+        });
+        
+        this.populateCustomDropdown('borrowAsset', assets.map(a => ({
+            id: a.symbol,
+            symbol: a.symbol,
+            name: a.name,
+            icon: a.icon
+        })), preselectedAsset ? preselectedAsset.symbol : null);
+        
+        // Set initial selection
+        if (preselectedAsset) {
+            this.selectedBorrowSymbol = preselectedAsset.symbol;
+            this.selectedBorrowNetwork = preselectedAsset.network;
+        } else if (assets.length > 0) {
+            this.selectedBorrowSymbol = assets[0].symbol;
+        }
+        
+        this.updateBorrowNetworkSelector();
+    }
+    
+    updateBorrowNetworkSelector() {
+        const selectedSymbol = this.selectedBorrowSymbol;
+        if (!selectedSymbol) return;
+        
+        // Get all networks for selected asset
+        const networks = MOCK_ASSETS.filter(a => a.symbol === selectedSymbol && a.borrowApr > 0);
+        
+        // Populate network dropdown
+        this.initializeCustomDropdown('borrowNetwork', (selectedNetwork) => {
+            this.selectedBorrowNetwork = selectedNetwork;
+            this.updateActualBorrowAssetSelection();
+        });
+        
+        this.populateCustomDropdown('borrowNetwork', networks.map(a => ({
+            id: a.network,
+            symbol: a.network,
+            name: a.network,
+            icon: this.getNetworkIcon(a.network)
+        })), this.selectedBorrowNetwork);
+        
+        // Auto-select first network if not set
+        if (!this.selectedBorrowNetwork && networks.length > 0) {
+            this.selectedBorrowNetwork = networks[0].network;
+        }
+        
+        this.updateActualBorrowAssetSelection();
+    }
+    
+    updateActualBorrowAssetSelection() {
+        if (!this.selectedBorrowSymbol || !this.selectedBorrowNetwork) return;
+        
+        const asset = MOCK_ASSETS.find(a => 
+            a.symbol === this.selectedBorrowSymbol && 
+            a.network === this.selectedBorrowNetwork &&
+            a.borrowApr > 0
+        );
+        
+        if (asset) {
+            this.selectedBorrowAsset = asset;
+            
+            // Update currency label
+            const borrowCurrency = document.getElementById('borrowCurrency');
+            if (borrowCurrency) {
+                this.updateCurrencyLabel(borrowCurrency, asset);
+            }
+            
+            this.updateBorrowModal();
+        }
     }
 
     updateCollateralTriggerText() {
@@ -3970,6 +4100,16 @@ class UI {
         
         if (!trigger || !dropdown || !container) return;
         
+        // Check if already initialized to avoid duplicate listeners
+        if (container.dataset.initialized === 'true') {
+            // Just update the onChange callback
+            this[`${dropdownId}OnChange`] = onChange;
+            return;
+        }
+        
+        // Mark as initialized
+        container.dataset.initialized = 'true';
+        
         // Toggle dropdown
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -3983,11 +4123,15 @@ class UI {
         });
         
         // Close on outside click
-        document.addEventListener('click', (e) => {
+        const outsideClickHandler = (e) => {
             if (!container.contains(e.target)) {
                 container.classList.remove('active');
             }
-        });
+        };
+        document.addEventListener('click', outsideClickHandler);
+        
+        // Store reference to cleanup later
+        container._outsideClickHandler = outsideClickHandler;
         
         // Store onChange callback
         container.dataset.onChange = dropdownId;
