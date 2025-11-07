@@ -2651,23 +2651,26 @@ class UI {
         
         this.initializeCustomDropdown('borrowAsset', (selectedSymbol) => {
             this.selectedBorrowSymbol = selectedSymbol;
+            // Reset network selection when asset changes
+            this.selectedBorrowNetwork = null;
             this.updateBorrowNetworkSelector();
         });
+        
+        // Set initial selection BEFORE populating dropdown
+        if (preselectedAsset) {
+            this.selectedBorrowSymbol = preselectedAsset.symbol;
+            this.selectedBorrowNetwork = preselectedAsset.network;
+        } else if (assets.length > 0) {
+            this.selectedBorrowSymbol = assets[0].symbol;
+            this.selectedBorrowNetwork = null;
+        }
         
         this.populateCustomDropdown('borrowAsset', assets.map(a => ({
             id: a.symbol,
             symbol: a.symbol,
             name: a.name,
             icon: a.icon
-        })), preselectedAsset ? preselectedAsset.symbol : null);
-        
-        // Set initial selection
-        if (preselectedAsset) {
-            this.selectedBorrowSymbol = preselectedAsset.symbol;
-            this.selectedBorrowNetwork = preselectedAsset.network;
-        } else if (assets.length > 0) {
-            this.selectedBorrowSymbol = assets[0].symbol;
-        }
+        })), this.selectedBorrowSymbol);
         
         this.updateBorrowNetworkSelector();
     }
@@ -2678,6 +2681,14 @@ class UI {
         
         // Get all networks for selected asset
         const networks = MOCK_ASSETS.filter(a => a.symbol === selectedSymbol && a.borrowApr > 0);
+        
+        // Check if currently selected network is available for this asset
+        const isNetworkAvailable = networks.some(a => a.network === this.selectedBorrowNetwork);
+        
+        // If no network selected or selected network not available, choose first one
+        if (!this.selectedBorrowNetwork || !isNetworkAvailable) {
+            this.selectedBorrowNetwork = networks.length > 0 ? networks[0].network : null;
+        }
         
         // Populate network dropdown
         this.initializeCustomDropdown('borrowNetwork', (selectedNetwork) => {
@@ -2691,11 +2702,6 @@ class UI {
             name: a.network,
             icon: this.getNetworkIcon(a.network)
         })), this.selectedBorrowNetwork);
-        
-        // Auto-select first network if not set
-        if (!this.selectedBorrowNetwork && networks.length > 0) {
-            this.selectedBorrowNetwork = networks[0].network;
-        }
         
         this.updateActualBorrowAssetSelection();
     }
