@@ -28,7 +28,7 @@ const MOCK_ASSETS = [
         icon: 'crypto/assets/steth.svg',
         assetType: 'native',
         depositApr: 3.43,
-        borrowApr: 0,
+        borrowApr: 0.001,
         price: 4218,
         canBeCollateral: true,
         ltv: 0.80,
@@ -1098,6 +1098,14 @@ class UI {
         });
     }
 
+    resetAllDropdownFlags() {
+        // Reset all custom dropdown initialization flags
+        document.querySelectorAll('.custom-dropdown').forEach(dropdown => {
+            dropdown.dataset.initialized = 'false';
+            dropdown.classList.remove('active');
+        });
+    }
+
     initializeModals() {
         // Close buttons
         document.querySelectorAll('.close-btn').forEach(btn => {
@@ -1107,21 +1115,8 @@ class UI {
                 // Close any open dropdowns
                 document.querySelectorAll('.collateral-selector').forEach(s => s.classList.remove('active'));
                 
-                // Reset borrow modal dropdowns when closing
-                if (modal && modal.id === 'borrowModal') {
-                    // Reset initialization flags for dropdowns
-                    const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
-                    const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
-                    
-                    if (borrowAssetDropdown) {
-                        borrowAssetDropdown.dataset.initialized = 'false';
-                        borrowAssetDropdown.classList.remove('active');
-                    }
-                    if (borrowNetworkDropdown) {
-                        borrowNetworkDropdown.dataset.initialized = 'false';
-                        borrowNetworkDropdown.classList.remove('active');
-                    }
-                }
+                // Reset all dropdown flags when closing any modal
+                this.resetAllDropdownFlags();
             });
         });
 
@@ -1133,20 +1128,8 @@ class UI {
                     // Close any open dropdowns
                     document.querySelectorAll('.collateral-selector').forEach(s => s.classList.remove('active'));
                     
-                    // Reset borrow modal dropdowns when closing
-                    if (modal.id === 'borrowModal') {
-                        const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
-                        const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
-                        
-                        if (borrowAssetDropdown) {
-                            borrowAssetDropdown.dataset.initialized = 'false';
-                            borrowAssetDropdown.classList.remove('active');
-                        }
-                        if (borrowNetworkDropdown) {
-                            borrowNetworkDropdown.dataset.initialized = 'false';
-                            borrowNetworkDropdown.classList.remove('active');
-                        }
-                    }
+                    // Reset all dropdown flags
+                    this.resetAllDropdownFlags();
                 }
             });
         });
@@ -1227,6 +1210,9 @@ class UI {
                 if (result) {
                     // Close modal
                     document.getElementById('depositModal').classList.remove('active');
+                    
+                    // Reset all dropdown flags
+                    this.resetAllDropdownFlags();
                     
                     // Clear inputs
                     document.getElementById('depositAmountInput').value = '';
@@ -1408,11 +1394,8 @@ class UI {
                 if (appState.borrow(asset.id, amount)) {
                     document.getElementById('borrowModal').classList.remove('active');
                     
-                    // Reset dropdown flags
-                    const borrowAssetDropdown = document.getElementById('borrowAssetTrigger')?.closest('.custom-dropdown');
-                    const borrowNetworkDropdown = document.getElementById('borrowNetworkTrigger')?.closest('.custom-dropdown');
-                    if (borrowAssetDropdown) borrowAssetDropdown.dataset.initialized = 'false';
-                    if (borrowNetworkDropdown) borrowNetworkDropdown.dataset.initialized = 'false';
+                    // Reset all dropdown flags
+                    this.resetAllDropdownFlags();
                     
                     this.render();
                 } else {
