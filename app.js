@@ -1441,20 +1441,6 @@ class UI {
             });
         }
 
-        // Borrow Page
-        document.getElementById('executeBorrowBtn').addEventListener('click', () => {
-            const assetId = document.getElementById('borrowAssetSelector').dataset.assetId || 'usds-ethereum';
-            const amount = parseNumber(document.getElementById('borrowAmount').value);
-
-            if (amount && amount > 0) {
-                if (appState.borrow(assetId, amount)) {
-                    document.getElementById('borrowAmount').value = '0';
-                    this.render();
-                    alert('Borrow successful!');
-                }
-            }
-        });
-
         // Pool Page
         document.getElementById('poolDepositBtn').addEventListener('click', () => {
             if (this.selectedPoolId) {
@@ -3673,49 +3659,6 @@ class UI {
         }
         document.getElementById('depositedStatus').innerHTML = 
             `<span>Already deposited ~$${totalDeposited.toFixed(2)}</span>`;
-
-        // Render active borrows
-        this.renderActiveBorrows();
-    }
-
-    renderActiveBorrows() {
-        const container = document.getElementById('activeBorrowsList');
-        const activeBorrows = appState.borrows.filter(b => !b.repaid);
-
-        if (activeBorrows.length === 0) {
-            container.innerHTML = '<div class="empty-state">No active borrows</div>';
-            return;
-        }
-
-        container.innerHTML = '';
-        activeBorrows.forEach(borrow => {
-            const asset = MOCK_ASSETS.find(a => a.id === borrow.assetId);
-            if (!asset) return;
-
-            const totalDebt = borrow.amount + borrow.accumulatedInterest;
-            const totalDebtUsd = totalDebt * asset.price;
-
-            const div = document.createElement('div');
-            div.className = 'borrow-item';
-            div.innerHTML = `
-                <div class="borrow-item-info">
-                    <h4>${asset.symbol} Borrow</h4>
-                    <p>Borrowed: ${borrow.amount.toFixed(8)} ${asset.symbol}</p>
-                    <p>Interest: ${borrow.accumulatedInterest.toFixed(8)} ${asset.symbol}</p>
-                    <p>Total Debt: ${totalDebt.toFixed(8)} ${asset.symbol} ($${totalDebtUsd.toFixed(2)})</p>
-                    <p>APR: ${asset.borrowApr}%</p>
-                </div>
-                <div class="borrow-item-actions">
-                    <button class="btn btn-primary" onclick="ui.repayBorrow('${borrow.id}', false)">
-                        Repay Part
-                    </button>
-                    <button class="btn btn-secondary" onclick="ui.repayBorrow('${borrow.id}', true)">
-                        Repay Full
-                    </button>
-                </div>
-            `;
-            container.appendChild(div);
-        });
     }
 
     repayBorrow(borrowId, full) {
